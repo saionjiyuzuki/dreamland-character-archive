@@ -1,0 +1,383 @@
+import type { Chart } from '../core/types.js';
+import { DEFAULT_HIT_EFFECT, DEFAULT_NOTE_SKIN, HIT_EFFECTS, NOTE_SKINS, findHitEffect, findNoteSkin, gradeLabel, setActiveCosmetics } from '../cosmetics/catalog.js';
+import { PASS_EXP_PER_TIER, PASS_MAX_TIER, PASS_SEASON, PASS_TIERS, PREMIUM_PASS_PRICE, cosmeticSource, isCosmeticReward, passReward, rewardLabel, type PassReward, type PassTrack } from './passSeason.js';
+import { DAILY_BONUS, dailyBonusReady, ensureDaily, findMission, formatCountdown, localDateKey, missionStatus, msUntilReset, recordPlay, type DailyState, type MissionReward } from './dailyMissions.js';
+import { CosmeticPreview } from '../render/cosmeticPreview.js';
+
+type SaveData = {
+  version:number; coins:number; crystals:number; exp:number; level:number; passExp:number; passLevel:number;
+  premiumPass:boolean; claimedFree:number[]; claimedPremium:number[];
+  unlockedSongs:string[]; ownedCosmetics:string[]; equippedCosmetic:string;
+  equippedNoteSkin:string; equippedHitEffect:string; daily:DailyState; plays:number;
+};
+type TierState = 'claimed' | 'claimable' | 'locked' | 'premiumLocked';
+type CosmeticKind = 'noteSkin' | 'hitEffect';
+export type PlayRewards = { coin:number; exp:number; levelUps:number; passUps:number; crystals:number; coins:number; missionsCompleted:string[]; claimable:number };
+
+const KEY = 'dreamland_economy_v1';
+const SAVE_VERSION = 2;
+
+/** Validate localStorage data because it can be stale, malformed, or manually edited. */
+export function normalizeSaveData(raw: unknown, base: SaveData): SaveData {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ...base, daily:ensureDaily(null) };
+  const value = raw as Partial<SaveData> & { claimedPass?: unknown };
+  const integer = (input: unknown, fallback: number, min = 0, max = Number.MAX_SAFE_INTEGER) =>
+    typeof input === 'number' && Number.isFinite(input)
+      ? Math.max(min, Math.min(max, Math.floor(input))) : fallback;
+  const stringList = (input: unknown, fallback: string[]) => Array.isArray(input)
+    ? [...new Set(input.filter((item): item is string => typeof item === 'string' && item.length <= 160))]
+    : [...fallback];
+  const tierList = (input: unknown, fallback: number[]) => Array.isArray(input)
+    ? [...new Set(input.filter((n): n is number => Number.isInteger(n) && n >= 1 && n <= PASS_MAX_TIER))]
+    : [...fallback];
+  // V12.8 saves auto-granted free-track currency into `claimedPass`; keep those tiers claimed
+  // and hand out any cosmetic that now sits on them so no reward is lost or paid twice.
+  const legacy = integer(value.version, 1) < SAVE_VERSION;
+  const claimedFree = tierList(value.claimedFree ?? (legacy ? value.claimedPass : undefined), base.claimedFree);
+  const ownedCosmetics = stringList(value.ownedCosmetics, base.ownedCosmetics);
+  if (legacy) for (const tier of claimedFree) {
+    const r = passReward('free', tier);
+    if (r && isCosmeticReward(r) && !ownedCosmetics.includes(r.id)) ownedCosmetics.push(r.id);
+  }
+  return {
+    version: SAVE_VERSION,
+    coins: integer(value.coins, base.coins),
+    crystals: integer(value.crystals, base.crystals),
+    exp: integer(value.exp, base.exp),
+    level: integer(value.level, base.level, 1),
+    passExp: integer(value.passExp, base.passExp, 0, PASS_EXP_PER_TIER - 1),
+    passLevel: integer(value.passLevel, base.passLevel, 1, PASS_MAX_TIER + 1),
+    premiumPass: value.premiumPass === true,
+    claimedFree,
+    claimedPremium: tierList(value.claimedPremium, base.claimedPremium),
+    unlockedSongs: stringList(value.unlockedSongs, base.unlockedSongs),
+    ownedCosmetics,
+    equippedCosmetic: typeof value.equippedCosmetic === 'string' ? value.equippedCosmetic : base.equippedCosmetic,
+    equippedNoteSkin: typeof value.equippedNoteSkin === 'string' ? value.equippedNoteSkin : base.equippedNoteSkin,
+    equippedHitEffect: typeof value.equippedHitEffect === 'string' ? value.equippedHitEffect : base.equippedHitEffect,
+    daily: ensureDaily(value.daily),
+    plays: integer(value.plays, base.plays),
+  };
+}
+
+function escapeHTML(value: unknown): string {
+  const entities: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  return String(value ?? '').replace(/[&<>"']/g, char => entities[char]);
+}
+const pad2 = (n:number) => String(n).padStart(2, '0');
+const FREE_SONGS=['song_test_destroyer','song_test_shinwa','song_test_multihold','song_sp_last_dance'];
+const COSMETICS=[
+  {id:'aura_aurora',name:'极光轨迹',desc:'判定与长条边缘呈现极光青紫色',price:250,accent:'#7cf5e5'},
+  {id:'aura_rose',name:'星云玫瑰',desc:'粉紫色梦境主题',price:400,accent:'#f5a7ff'},
+  {id:'aura_gold',name:'晨曦金辉',desc:'金色发光主题',price:650,accent:'#ffd98a'},
+  {id:'aura_void',name:'虚空棱镜',desc:'冷白与蓝紫主题',price:900,accent:'#b9c7ff'}
+];
+
+function summarize(rewards:PassReward[], extra:MissionReward = { passExp:0 }):string {
+  let coin = extra.coin || 0, crystal = extra.crystal || 0;
+  const items:string[] = [];
+  for (const r of rewards) {
+    if (r.kind === 'coin') coin += r.amount;
+    else if (r.kind === 'crystal') crystal += r.amount;
+    else items.push(rewardLabel(r));
+  }
+  return [extra.passExp ? `+${extra.passExp} 通行证 EXP` : '', crystal ? `✧ ${crystal} Crystal` : '', coin ? `◉ ${coin} Coin` : '', ...items].filter(Boolean).join(' · ');
+}
+
+export class EconomyService {
+  data:SaveData;
+  private charts:Record<string,Chart>;
+  private view = 'pass';
+  private preview = new CosmeticPreview();
+  private previewPick = { skin:DEFAULT_NOTE_SKIN, fx:DEFAULT_HIT_EFFECT };
+  private timer:ReturnType<typeof setInterval> | null = null;
+
+  constructor(charts:Record<string,Chart>,private toast:(s:string)=>void){
+    this.charts=charts;
+    const base:SaveData={version:SAVE_VERSION,coins:0,crystals:0,exp:0,level:1,passExp:0,passLevel:1,premiumPass:false,claimedFree:[],claimedPremium:[],unlockedSongs:[...FREE_SONGS],ownedCosmetics:[],equippedCosmetic:'default',equippedNoteSkin:DEFAULT_NOTE_SKIN,equippedHitEffect:DEFAULT_HIT_EFFECT,daily:ensureDaily(null),plays:0};
+    try { this.data = normalizeSaveData(JSON.parse(localStorage.getItem(KEY) || 'null'), base); } catch { this.data = { ...base }; }
+    this.data.unlockedSongs=[...new Set([...FREE_SONGS,...(this.data.unlockedSongs||[])])];
+    if (!this.owns(this.data.equippedNoteSkin) || !findNoteSkin(this.data.equippedNoteSkin)) this.data.equippedNoteSkin = DEFAULT_NOTE_SKIN;
+    if (!this.owns(this.data.equippedHitEffect) || !findHitEffect(this.data.equippedHitEffect)) this.data.equippedHitEffect = DEFAULT_HIT_EFFECT;
+    this.applyCosmetic(); this.bindEvents(); this.refresh();
+  }
+  save(){try{localStorage.setItem(KEY,JSON.stringify(this.data));}catch{} this.refresh();}
+  isSongUnlocked(id:string){return this.data.unlockedSongs.includes(id);}
+  songPrice(chart:Chart){return Math.max(3,Math.min(18,Math.round((Number((chart as any).diff)||8)*1.25)));}
+
+  grantPlayRewards(g:any):PlayRewards{
+    const pure=Number(g.pure)||0,great=Number(g.great)||0,far=Number(g.far)||0,lost=Number(g.lost)||0;
+    const total=Math.max(1,pure+great+far+lost);
+    const accuracy=(pure+great*.75+far*.5)/total;
+    const coin=Math.round(18+accuracy*22+Math.min(12,(Number(g.chart?.diff)||1)));
+    const exp=Math.round(45+accuracy*35+Math.min(30,(Number(g.chart?.diff)||1)*2));
+    this.data.coins+=coin; this.data.exp+=exp; this.data.plays++;
+    let levelUps=0;
+    while(this.data.exp>=this.expForNextLevel(this.data.level)){this.data.exp-=this.expForNextLevel(this.data.level);this.data.level++;this.data.crystals+=5;levelUps++;}
+    const passUps=this.addPassExp(exp);
+    const completed=recordPlay(this.daily(),{songId:String(g.chart?.id||''),pure,great,far,lost,maxCombo:Number(g.maxCombo)||0,score:Number(g.score)||0,accuracy});
+    this.save();
+    return {coin,exp,levelUps,passUps,crystals:this.data.crystals,coins:this.data.coins,missionsCompleted:completed.map(id=>findMission(id)?.title||id),claimable:this.claimableCount()};
+  }
+  expForNextLevel(level:number){return 100+(Math.max(1,level)-1)*25;}
+
+  /* ── V-PASS ── */
+  /** Highest tier whose rewards are unlocked (0 before the first tier-up). */
+  reachedTier(){return Math.min(PASS_MAX_TIER,this.data.passLevel-1);}
+  addPassExp(amount:number){
+    if(this.data.passLevel>PASS_MAX_TIER){this.data.passExp=0;return 0;}
+    this.data.passExp+=Math.max(0,Math.floor(amount));
+    let ups=0;
+    while(this.data.passExp>=PASS_EXP_PER_TIER&&this.data.passLevel<=PASS_MAX_TIER){this.data.passExp-=PASS_EXP_PER_TIER;this.data.passLevel++;ups++;}
+    if(this.data.passLevel>PASS_MAX_TIER)this.data.passExp=0;
+    return ups;
+  }
+  tierState(track:PassTrack,tier:number):TierState{
+    if((track==='free'?this.data.claimedFree:this.data.claimedPremium).includes(tier))return 'claimed';
+    if(tier>this.reachedTier())return 'locked';
+    if(track==='premium'&&!this.data.premiumPass)return 'premiumLocked';
+    return 'claimable';
+  }
+  passClaimableCount(){let n=0;for(const row of PASS_TIERS){if(this.tierState('free',row.tier)==='claimable')n++;if(this.tierState('premium',row.tier)==='claimable')n++;}return n;}
+  missionClaimableCount(){const d=this.daily();return d.missions.filter(id=>missionStatus(d,id).claimable).length+(dailyBonusReady(d)?1:0);}
+  claimableCount(){return this.passClaimableCount()+this.missionClaimableCount();}
+  private grantReward(r:PassReward){
+    if(r.kind==='coin')this.data.coins+=r.amount;
+    else if(r.kind==='crystal')this.data.crystals+=r.amount;
+    else if(!this.data.ownedCosmetics.includes(r.id))this.data.ownedCosmetics.push(r.id);
+  }
+  private takeTier(track:PassTrack,tier:number):PassReward|null{
+    const r=passReward(track,tier);
+    if(!r||this.tierState(track,tier)!=='claimable')return null;
+    (track==='free'?this.data.claimedFree:this.data.claimedPremium).push(tier);
+    this.grantReward(r);
+    return r;
+  }
+  claimTier(track:PassTrack,tier:number){
+    const r=this.takeTier(track,tier);
+    if(!r)return false;
+    this.save();this.toast(`已领取 TIER ${pad2(tier)}：${rewardLabel(r)}`);this.rerender();
+    return true;
+  }
+  claimAllPass(){
+    const got:PassReward[]=[];
+    for(const row of PASS_TIERS)for(const track of ['free','premium'] as const){const r=this.takeTier(track,row.tier);if(r)got.push(r);}
+    if(!got.length){this.toast('暂无可领取的奖励');return 0;}
+    this.save();this.toast(`已领取 ${got.length} 项奖励：${summarize(got)}`);this.rerender();
+    return got.length;
+  }
+  buyPremium(){
+    if(this.data.premiumPass){this.toast('高级通行证已激活');return false;}
+    if(this.data.crystals<PREMIUM_PASS_PRICE){this.toast(`Crystal 不足：需要 ${PREMIUM_PASS_PRICE}`);return false;}
+    this.data.crystals-=PREMIUM_PASS_PRICE;this.data.premiumPass=true;this.save();
+    const pending=PASS_TIERS.filter(row=>this.tierState('premium',row.tier)==='claimable').length;
+    this.toast(`高级通行证已激活${pending?`，${pending} 项高级奖励可领取`:''}`);this.rerender();
+    return true;
+  }
+
+  /* ── 每日任务 ── */
+  daily():DailyState{if(this.data.daily.date!==localDateKey())this.data.daily=ensureDaily(null);return this.data.daily;}
+  private grantMissionReward(r:MissionReward){
+    this.data.coins+=r.coin||0;this.data.crystals+=r.crystal||0;
+    const ups=this.addPassExp(r.passExp);
+    return ups?` · V-PASS 升至 LV.${pad2(this.reachedTier())}`:'';
+  }
+  claimMission(id:string){
+    const d=this.daily(),st=missionStatus(d,id);
+    if(!st.def||!st.claimable)return false;
+    d.claimed.push(id);
+    const up=this.grantMissionReward(st.def.reward);
+    this.save();this.toast(`任务完成：${summarize([],st.def.reward)}${up}`);this.rerender();
+    return true;
+  }
+  claimDailyBonus(){
+    const d=this.daily();
+    if(!dailyBonusReady(d))return false;
+    d.bonusClaimed=true;
+    const up=this.grantMissionReward(DAILY_BONUS);
+    this.save();this.toast(`每日全勤奖励：${summarize([],DAILY_BONUS)}${up}`);this.rerender();
+    return true;
+  }
+
+  /* ── 装扮 ── */
+  owns(id:string){const def=findNoteSkin(id)||findHitEffect(id);return def?.grade==='default'||this.data.ownedCosmetics.includes(id);}
+  equip(kind:CosmeticKind,id:string){
+    const def=kind==='noteSkin'?findNoteSkin(id):findHitEffect(id);
+    if(!def)return false;
+    if(!this.owns(id)){this.toast(`尚未获得「${def.name}」：${cosmeticSource(id)||'V-PASS 奖励'}`);return false;}
+    if(kind==='noteSkin')this.data.equippedNoteSkin=id;else this.data.equippedHitEffect=id;
+    this.previewPick=kind==='noteSkin'?{...this.previewPick,skin:id}:{...this.previewPick,fx:id};
+    this.applyCosmetic();this.save();this.toast(`已装备${kind==='noteSkin'?'音符':'打击特效'}「${def.name}」`);this.rerender();
+    return true;
+  }
+
+  buySong(id:string){const chart=this.charts[id];if(!chart)return;if(this.isSongUnlocked(id)){this.toast('这首歌已经解锁');return;}const price=this.songPrice(chart);if(this.data.crystals<price){this.toast(`Crystal 不足：需要 ${price}`);return;}this.data.crystals-=price;this.data.unlockedSongs.push(id);this.save();this.toast(`已解锁《${chart.title}》`);this.renderModal('songs');}
+  buyCosmetic(id:string){const item=COSMETICS.find(x=>x.id===id);if(!item)return;if(this.data.ownedCosmetics.includes(id)){this.data.equippedCosmetic=id;this.applyCosmetic();this.save();this.toast(`已装备「${item.name}」`);this.renderModal('cosmetics');return;}if(this.data.coins<item.price){this.toast(`Coin 不足：需要 ${item.price}`);return;}this.data.coins-=item.price;this.data.ownedCosmetics.push(id);this.data.equippedCosmetic=id;this.applyCosmetic();this.save();this.toast(`购买并装备「${item.name}」`);this.renderModal('cosmetics');}
+  applyCosmetic(){
+    const item=COSMETICS.find(x=>x.id===this.data.equippedCosmetic);
+    document.documentElement.style.setProperty('--hold',item?.accent||'#6ee7d6');document.documentElement.style.setProperty('--holdb',item?.accent||'#a5f3fc');
+    setActiveCosmetics(this.data.equippedNoteSkin,this.data.equippedHitEffect);
+  }
+  refresh(){
+    const lv=this.data.level,exp=this.data.exp,next=this.expForNextLevel(lv),pct=Math.min(100,exp/next*100);
+    document.querySelectorAll('.dream-level strong').forEach(e=>{e.textContent=`LV. ${String(lv).padStart(2,'0')}`;});
+    document.querySelectorAll('.dream-level small').forEach(e=>{e.textContent=`${exp} / ${next} EXP`;});
+    document.querySelectorAll('.select-player small').forEach(e=>{e.textContent=`LV. ${String(lv).padStart(2,'0')} · ${exp} / ${next} EXP`;});
+    document.querySelectorAll('.dream-profile-level').forEach(e=>{e.innerHTML=`Lv. ${String(lv).padStart(2,'0')} <span>旅程等级</span>`;});
+    document.querySelectorAll('.dream-exp i,.select-exp i,.dream-profile-progress i').forEach(e=>{(e as HTMLElement).style.width=pct+'%';});
+    const resources=Array.from(document.querySelectorAll('.dream-resource'));if(resources[0]){const el=resources[0].querySelector('strong');if(el)el.textContent=String(this.data.crystals);}if(resources[1]){const el=resources[1].querySelector('strong');if(el)el.textContent=String(this.data.coins);}
+    const wallet=document.getElementById('economyWallet');if(wallet)wallet.textContent=`✧ ${this.data.crystals} Crystal　 ◉ ${this.data.coins} Coin`;
+    // Red-dot badges on every entry point that leads to claimable rewards.
+    const badges:Record<string,number>={pass:this.passClaimableCount(),missions:this.missionClaimableCount()};
+    document.querySelectorAll<HTMLElement>('[data-economy-open],[data-eco-tab]').forEach(el=>{
+      const n=badges[el.dataset.economyOpen||el.dataset.ecoTab||'']||0;
+      if(n>0)el.dataset.badge=String(n);else delete el.dataset.badge;
+    });
+  }
+
+  /* ── Modal ── */
+  open(view:string='pass'){
+    const modal=document.getElementById('economyModal');if(!modal)return;
+    modal.classList.remove('hidden');
+    this.previewPick={skin:this.data.equippedNoteSkin,fx:this.data.equippedHitEffect};
+    this.view='';  // fresh open: re-centre the V-PASS track instead of restoring a stale scroll
+    this.renderModal(view);
+    if(!this.timer)this.timer=setInterval(()=>this.tick(),1000);
+  }
+  close(){
+    document.getElementById('economyModal')?.classList.add('hidden');
+    this.preview.stop();
+    if(this.timer){clearInterval(this.timer);this.timer=null;}
+  }
+  private tick(){
+    if(document.getElementById('economyModal')?.classList.contains('hidden')){this.close();return;}
+    if(this.data.daily.date!==localDateKey()){this.daily();this.save();if(this.view==='missions')this.rerender();}
+    const el=document.querySelector('[data-daily-countdown]');if(el)el.textContent=formatCountdown(msUntilReset());
+  }
+  private rerender(){if(!document.getElementById('economyModal')?.classList.contains('hidden'))this.renderModal(this.view);}
+  renderModal(view:string){
+    const body=document.getElementById('economyBody');if(!body)return;
+    const prevView=this.view;
+    this.view=view==='shop'?'cosmetics':view;
+    if(this.view==='loadout'&&prevView!=='loadout')this.previewPick={skin:this.data.equippedNoteSkin,fx:this.data.equippedHitEffect};
+    const track=body.querySelector<HTMLElement>('.vp-track'),keepScroll=prevView===this.view&&track?track.scrollLeft:null;
+    this.preview.stop();
+    const wallet=`<div class="eco-wallet">✧ ${this.data.crystals} Crystal <span>·</span> ◉ ${this.data.coins} Coin</div>`;
+    if(this.view==='pass'||this.view==='missions'||this.view==='loadout'){
+      const content=this.view==='pass'?this.passHTML():this.view==='missions'?this.missionsHTML():this.loadoutHTML();
+      body.innerHTML=`${wallet}${this.progressionTabs()}${content}`;
+    }else{
+      const tab=this.view==='songs'?'songs':'cosmetics';
+      const cosmetics=COSMETICS.map(x=>{const owned=this.data.ownedCosmetics.includes(x.id),equipped=this.data.equippedCosmetic===x.id;return `<article class="eco-item"><div class="eco-item-art" style="--item-accent:${x.accent}">✧</div><div class="eco-item-info"><strong>${escapeHTML(x.name)}</strong><small>${escapeHTML(x.desc)}</small><span>${owned?'已拥有':`◉ ${x.price} Coin`}</span></div><button data-buy-cosmetic="${x.id}">${equipped?'已装备':owned?'装备':`购买 ${x.price}`}</button></article>`}).join('');
+      const songs=Object.values(this.charts).filter(c=>!this.isSongUnlocked(c.id)).map(c=>`<article class="eco-item"><div class="eco-item-art">♫</div><div class="eco-item-info"><strong>${escapeHTML(c.title)}</strong><small>${escapeHTML(c.artist)} · SP ${escapeHTML(c.diff)}</small><span>✧ ${this.songPrice(c)} Crystal</span></div><button data-buy-song="${escapeHTML(c.id)}">解锁歌曲</button></article>`).join('')||'<p class="eco-note">曲库已全部解锁。</p>';
+      body.innerHTML=`${wallet}<div class="eco-tabs"><button data-eco-tab="cosmetics" class="${tab==='cosmetics'?'active':''}">Coin 装扮商店</button><button data-eco-tab="songs" class="${tab==='songs'?'active':''}">Crystal 歌曲商店</button></div><div class="eco-items">${tab==='songs'?songs:cosmetics}</div><p class="eco-note">Coin 通过正常打歌获得，可购买外观装扮；Crystal 通过升级、V-PASS 与每日任务获得，可解锁歌曲。音符样式与打击特效在「通行证 → 装扮」中装备。数据保存在本机浏览器。</p>`;
+    }
+    this.refresh();
+    const canvas=body.querySelector<HTMLCanvasElement>('[data-cosmetic-preview]');
+    if(canvas){this.preview.set(this.previewPick.skin,this.previewPick.fx);this.preview.attach(canvas);}
+    const nextTrack=body.querySelector<HTMLElement>('.vp-track');
+    if(nextTrack){
+      if(keepScroll!==null)nextTrack.scrollLeft=keepScroll;
+      else{const cur=nextTrack.querySelector<HTMLElement>('.vp-col.current')||nextTrack.querySelector<HTMLElement>('.vp-col:last-child');if(cur)nextTrack.scrollLeft=Math.max(0,cur.offsetLeft-nextTrack.clientWidth/2+cur.offsetWidth/2);}
+    }
+  }
+  private progressionTabs(){
+    const tab=(id:string,label:string)=>`<button data-eco-tab="${id}" class="${this.view===id?'active':''}">${label}</button>`;
+    return `<div class="eco-tabs prog-tabs">${tab('pass','V-PASS 通行证')}${tab('missions','每日任务')}${tab('loadout','装扮 · 特效')}</div>`;
+  }
+  private rewardIcon(r:PassReward){
+    if(r.kind==='coin')return `<span class="vp-icon coin">◉</span>`;
+    if(r.kind==='crystal')return `<span class="vp-icon crystal">✧</span>`;
+    if(r.kind==='noteSkin')return `<span class="vp-icon skin" style="--accent:${findNoteSkin(r.id)?.accent||'#c4b5fd'}"><i class="vp-skin-swatch"></i></span>`;
+    return `<span class="vp-icon fx" style="--accent:${findHitEffect(r.id)?.color||'#e0e7ff'}">✺</span>`;
+  }
+  private passCell(track:PassTrack,tier:number){
+    const r=passReward(track,tier);if(!r)return '';
+    const st=this.tierState(track,tier);
+    const cosmetic=isCosmeticReward(r)?(r.kind==='noteSkin'?findNoteSkin(r.id):findHitEffect(r.id)):undefined;
+    const title=r.kind==='coin'?`${r.amount}<small> Coin</small>`:r.kind==='crystal'?`${r.amount}<small> Crystal</small>`:escapeHTML(cosmetic?.name||'');
+    const tag=cosmetic?`<em class="grade-tag ${cosmetic.grade}">${gradeLabel(cosmetic.grade)}${r.kind==='noteSkin'?'音符':'特效'}</em>`:'';
+    const status=st==='claimed'?'✓ 已领取':st==='claimable'?'领取':st==='premiumLocked'?'🔒 高级':`LV.${pad2(tier)}`;
+    return `<button type="button" class="vp-cell ${track} ${st}${cosmetic?' cosmetic':''}" data-pass-claim="${track}:${tier}">${this.rewardIcon(r)}<strong>${title}</strong>${tag}<small>${status}</small></button>`;
+  }
+  private featuredPick(){
+    const firstPremium=(kind:'noteSkin'|'hitEffect')=>{for(const row of PASS_TIERS){const r=row.premium;if(isCosmeticReward(r)&&r.kind===kind&&!this.owns(r.id))return r.id;}return kind==='noteSkin'?'skin_prism':'fx_nova';};
+    return {skin:firstPremium('noteSkin'),fx:firstPremium('hitEffect')};
+  }
+  private passHTML(){
+    const reached=this.reachedTier(),maxed=this.data.passLevel>PASS_MAX_TIER,premium=this.data.premiumPass;
+    const claimable=this.passClaimableCount(),pct=maxed?100:this.data.passExp/PASS_EXP_PER_TIER*100;
+    if(this.previewPick.skin===this.data.equippedNoteSkin&&this.previewPick.fx===this.data.equippedHitEffect)this.previewPick=this.featuredPick();
+    const cols=PASS_TIERS.map(row=>`<div class="vp-col${reached>=row.tier?' reached':''}${row.tier===reached+1?' current':''}${row.tier%5===0?' milestone':''}"><div class="vp-tier-num">${pad2(row.tier)}</div>${this.passCell('free',row.tier)}${this.passCell('premium',row.tier)}</div>`).join('');
+    return `<section class="vp-hero${premium?' is-premium':''}">
+      <div class="vp-hero-copy"><div class="vpass-brand">V-PASS</div><div class="vpass-season">${PASS_SEASON.code} · DREAMLAND / ${PASS_SEASON.name}</div>
+        <div class="vp-level"><b>${pad2(reached)}</b><span>/ ${PASS_MAX_TIER}</span><em class="${premium?'premium':''}">${premium?'PREMIUM':'FREE'}</em></div>
+        <div class="vp-xp"><small><span>${maxed?'赛季已满级':`距离 TIER ${pad2(reached+1)}`}</span><span>${maxed?'MAX':`${this.data.passExp} / ${PASS_EXP_PER_TIER} EXP`}</span></small><div class="eco-progress"><i style="width:${pct}%"></i></div></div>
+        <p>演奏歌曲与完成每日任务获得 V-PASS EXP。每 5 级里程碑奖励 Crystal，初级音符与打击特效在免费轨道，高级款式在高级轨道。</p></div>
+      <div class="vp-showcase"><canvas class="cosmetic-preview" data-cosmetic-preview></canvas><div class="vp-showcase-copy"><small>REWARD PREVIEW</small><strong data-preview-label>${this.previewLabel()}</strong><span>点击轨道中的音符 / 特效奖励即可预览</span></div></div>
+    </section>
+    <div class="vp-actions"><button type="button" class="vp-claim-all" data-pass-claim-all ${claimable?'':'disabled'}>一键领取${claimable?` · ${claimable}`:''}</button>${premium?'<span class="vp-premium-owned">✦ 高级通行证已激活</span>':`<button type="button" class="vp-buy" data-pass-premium><b>解锁高级通行证</b><small>✧ ${PREMIUM_PASS_PRICE} Crystal · 立即补领已达成等级的高级奖励</small></button>`}</div>
+    <div class="vp-board"><div class="vp-rail-labels"><span class="lbl-tier">TIER</span><span class="lbl-free">免费<small>FREE</small></span><span class="lbl-premium">高级<small>PREMIUM</small></span></div><div class="vp-track">${cols}</div></div>
+    <p class="eco-note">奖励需手动领取，达到满级后不会过期。高级通行证使用游戏内 Crystal 解锁，不涉及真实支付；免费轨道共 110 Crystal，高级轨道共 122 Crystal。</p>`;
+  }
+  private previewLabel(){return `${escapeHTML(findNoteSkin(this.previewPick.skin)?.name||'')} × ${escapeHTML(findHitEffect(this.previewPick.fx)?.name||'')}`;}
+  private setPreview(kind:CosmeticKind,id:string){
+    this.previewPick=kind==='noteSkin'?{...this.previewPick,skin:id}:{...this.previewPick,fx:id};
+    this.preview.set(this.previewPick.skin,this.previewPick.fx);
+    document.querySelectorAll('[data-preview-label]').forEach(el=>{el.innerHTML=this.previewLabel();});
+    document.querySelectorAll<HTMLElement>(`[data-loadout-preview^="${kind}:"]`).forEach(el=>el.classList.toggle('previewing',el.dataset.loadoutPreview===`${kind}:${id}`));
+  }
+  private missionsHTML(){
+    const d=this.daily(),fmt=(id:string,n:number)=>id==='acc_95'?`${n}%`:n.toLocaleString();
+    const chips=(r:MissionReward)=>`<span class="chip exp">+${r.passExp} EXP</span>${r.coin?`<span class="chip coin">◉ ${r.coin}</span>`:''}${r.crystal?`<span class="chip crystal">✧ ${r.crystal}</span>`:''}`;
+    const cards=d.missions.map(id=>{
+      const st=missionStatus(d,id);if(!st.def)return '';
+      const pct=Math.min(100,st.value/st.target*100);
+      return `<article class="daily-card${st.claimable?' ready':''}${st.claimed?' claimed':''}"><div class="daily-info"><strong>${escapeHTML(st.def.title)}</strong><div class="daily-bar"><i style="width:${pct}%"></i></div><small>${fmt(id,st.value)} / ${fmt(id,st.target)}</small></div><div class="daily-rewards">${chips(st.def.reward)}</div><button type="button" data-daily-claim="${id}" ${st.claimable?'':'disabled'}>${st.claimed?'已领取':st.claimable?'领取':'进行中'}</button></article>`;
+    }).join('');
+    const done=d.missions.filter(id=>d.claimed.includes(id)).length,ready=dailyBonusReady(d);
+    return `<section class="daily-head"><div><small>DAILY MISSIONS · ${d.date}</small><h3>每日任务</h3><p>完成任务获得 V-PASS EXP、Coin 与 Crystal，AUTO 演奏不计入进度。</p></div><div class="daily-reset"><small>距离刷新</small><b data-daily-countdown>${formatCountdown(msUntilReset())}</b></div></section>
+    <div class="daily-list">${cards}</div>
+    <div class="daily-bonus${ready?' ready':''}${d.bonusClaimed?' claimed':''}"><div><strong>全部完成奖励</strong><small>领取今日全部 ${d.missions.length} 个任务后解锁 · ${done} / ${d.missions.length}</small><div class="daily-bar"><i style="width:${done/Math.max(1,d.missions.length)*100}%"></i></div></div><div class="daily-rewards">${chips(DAILY_BONUS)}</div><button type="button" data-daily-bonus ${ready?'':'disabled'}>${d.bonusClaimed?'已领取':ready?'领取':'未完成'}</button></div>`;
+  }
+  private loadoutHTML(){
+    const card=(kind:CosmeticKind,def:{id:string;name:string;desc:string;grade:'default'|'basic'|'premium'},accent:string)=>{
+      const owned=this.owns(def.id),equipped=(kind==='noteSkin'?this.data.equippedNoteSkin:this.data.equippedHitEffect)===def.id;
+      const previewing=(kind==='noteSkin'?this.previewPick.skin:this.previewPick.fx)===def.id;
+      const art=kind==='noteSkin'?'<i class="vp-skin-swatch"></i>':'✺';
+      return `<article class="loadout-card ${def.grade}${equipped?' equipped':''}${owned?'':' locked'}${previewing?' previewing':''}" data-loadout-preview="${kind}:${def.id}"><span class="loadout-art" style="--accent:${accent}">${art}</span><div class="loadout-info"><strong>${escapeHTML(def.name)} <em class="grade-tag ${def.grade}">${gradeLabel(def.grade)}</em></strong><small>${escapeHTML(def.desc)}</small>${owned?'':`<span class="loadout-source">🔒 ${escapeHTML(cosmeticSource(def.id))}</span>`}</div><button type="button" data-loadout-equip="${kind}:${def.id}" ${owned&&!equipped?'':'disabled'}>${equipped?'已装备':owned?'装备':'未获得'}</button></article>`;
+    };
+    const skinName=findNoteSkin(this.data.equippedNoteSkin)?.name||'',fxName=findHitEffect(this.data.equippedHitEffect)?.name||'';
+    return `<section class="loadout-stage"><canvas class="cosmetic-preview" data-cosmetic-preview></canvas><div class="loadout-current"><small>CURRENT LOADOUT</small><strong>音符 · ${escapeHTML(skinName)}</strong><strong>特效 · ${escapeHTML(fxName)}</strong><span>预览：<b data-preview-label>${this.previewLabel()}</b></span><span>点击卡片预览；未获得的款式同样可以试看。</span></div></section>
+    <h4 class="loadout-title">音符样式 <small>NOTE SKIN</small></h4><div class="loadout-grid">${NOTE_SKINS.map(s=>card('noteSkin',s,s.accent)).join('')}</div>
+    <h4 class="loadout-title">打击特效 <small>HIT EFFECT</small></h4><div class="loadout-grid">${HIT_EFFECTS.map(e=>card('hitEffect',e,e.color)).join('')}</div>`;
+  }
+  bindEvents(){
+    document.addEventListener('click',(ev)=>{const t=ev.target instanceof Element?ev.target:null;if(!t)return;
+      const opener=t.closest('[data-economy-open]') as HTMLElement|null;if(opener){this.open(opener.dataset.economyOpen||'pass');return;}
+      if(t.closest('[data-economy-close]')){this.close();return;}
+      const tab=t.closest('[data-eco-tab]') as HTMLElement|null;if(tab){this.renderModal(tab.dataset.ecoTab||'cosmetics');return;}
+      const song=t.closest('[data-buy-song]') as HTMLElement|null;if(song?.dataset.buySong){this.buySong(song.dataset.buySong);return;}
+      const cosmetic=t.closest('[data-buy-cosmetic]') as HTMLElement|null;if(cosmetic?.dataset.buyCosmetic){this.buyCosmetic(cosmetic.dataset.buyCosmetic);return;}
+      if(t.closest('[data-pass-claim-all]')){this.claimAllPass();return;}
+      if(t.closest('[data-pass-premium]')){this.buyPremium();return;}
+      const cell=t.closest('[data-pass-claim]') as HTMLElement|null;
+      if(cell?.dataset.passClaim){
+        const [track,tierText]=cell.dataset.passClaim.split(':'),tier=Number(tierText);
+        if((track==='free'||track==='premium')&&Number.isInteger(tier)){
+          const r=passReward(track,tier);
+          if(this.tierState(track,tier)==='claimable')this.claimTier(track,tier);
+          else if(r&&isCosmeticReward(r))this.setPreview(r.kind,r.id);
+          else if(this.tierState(track,tier)==='premiumLocked')this.toast(`解锁高级通行证（✧ ${PREMIUM_PASS_PRICE} Crystal）后可领取`);
+        }
+        return;
+      }
+      const mission=t.closest('[data-daily-claim]') as HTMLElement|null;if(mission?.dataset.dailyClaim){this.claimMission(mission.dataset.dailyClaim);return;}
+      if(t.closest('[data-daily-bonus]')){this.claimDailyBonus();return;}
+      const equip=t.closest('[data-loadout-equip]') as HTMLElement|null;
+      if(equip?.dataset.loadoutEquip){const [kind,id]=equip.dataset.loadoutEquip.split(':');if(kind==='noteSkin'||kind==='hitEffect')this.equip(kind,id);return;}
+      const pick=t.closest('[data-loadout-preview]') as HTMLElement|null;
+      if(pick?.dataset.loadoutPreview){const [kind,id]=pick.dataset.loadoutPreview.split(':');if(kind==='noteSkin'||kind==='hitEffect')this.setPreview(kind,id);return;}
+    });
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "id": "mh-example-variable-width",
+  "type": "multiHold",
+  "lanes": [1, 2, 3],
+  "startTime": 5000,
+  "endTime": 9000,
+  "tickIntervalMs": 500,
+  "path": {
+    "points": [
+      { "time": 0, "centerLane": 2.5, "width": 3.0 },
+      { "time": 1000, "centerLane": 3.0, "width": 2.0 },
+      { "time": 2200, "leftLane": 2.5, "rightLane": 4.0 },
+      { "time": 3100, "centerLane": 4.0, "width": 3.5 },
+      { "time": 4000, "lanes": [1, 2, 3] }
+    ]
+  }
+}
