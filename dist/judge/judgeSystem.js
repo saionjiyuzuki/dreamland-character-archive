@@ -1,3 +1,4 @@
+import { applyGauge } from '../gameplay/lifeGauge.js';
 export class JudgeSystem {
     d;
     PURE_W = 45;
@@ -25,6 +26,7 @@ export class JudgeSystem {
             if (G.combo > G.maxCombo)
                 G.maxCombo = G.combo;
         }
+        applyGauge(G, result);
         G.score += (1000000 / total) * weight * mul;
         G.remaining = Math.max(0, G.remaining - 1);
         if (effect && note) {
@@ -137,8 +139,10 @@ export class JudgeSystem {
             if (note.dead)
                 continue;
             const missing = note.isMultiHold ? Math.max(0, this.d.chart.noteUnitCount(note) - (note.multiHoldUnitsDone || 0)) : note.isHold ? Math.max(0, (note.totalTicks || this.d.chart.noteUnitCount(note)) - (note.ticksDone || 0)) : (note.judged ? 0 : 1);
-            if (missing > 0)
+            if (missing > 0) {
                 G.lost += missing;
+                applyGauge(G, 'LOST', missing);
+            }
             note.dead = true;
         }
         G.remaining = 0;

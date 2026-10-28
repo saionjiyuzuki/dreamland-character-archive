@@ -1,7 +1,12 @@
 import type { Chart } from '../core/types.js';
-import { LAST_DANCE_SP20 } from './lastDanceChart.js';
+import { LAST_DANCE_DZ } from './lastDanceChart.js';
+import { SONG_CHARTS } from './songCharts.js';
 
-/** Built-in SP charts. EZ / HD / EX charts are derived and registered by songs.ts. */
+/**
+ * Every built-in chart, keyed song_{ez,hd,ex,dz}_<song>. The EZ / HD / EX / DZ charts are generated from the audio
+ * by scripts/charts/generate.mjs; Last Dance DZ is the hand-designed chart from scripts/charts/last-dance.mjs.
+ */
 export const CHARTS: Record<string, Chart> = {
-  song_sp_last_dance: LAST_DANCE_SP20,
+  ...SONG_CHARTS,
+  song_dz_last_dance: LAST_DANCE_DZ,
 };

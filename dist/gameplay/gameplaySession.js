@@ -1,3 +1,4 @@
+import { resetGauge } from './lifeGauge.js';
 export class GameplaySession {
     d;
     constructor(d) {
@@ -49,6 +50,9 @@ export class GameplaySession {
         G.multiHoldPointers?.clear?.();
         G.lastScore = '';
         G.lastCombo = '';
+        G.lastAcc = '';
+        G.lastHp = '';
+        resetGauge(G);
         this.d.loadChart(chart);
         G.audioStarted = false;
         G.preludeMs = this.computePreludeMs();
@@ -71,6 +75,8 @@ export class GameplaySession {
         D.score.textContent = '0000000';
         D.hudSpeed.textContent = G.speed.toFixed(1);
         D.progressFill.style.width = '0%';
+        G.laneFlashAt = [];
+        this.d.updateUI();
         this.d.visiblePage(null);
         this.d.renderLanes();
         this.d.GameClock.start(-G.preludeMs);

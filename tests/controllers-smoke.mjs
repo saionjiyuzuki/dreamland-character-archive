@@ -8,6 +8,8 @@ globalThis.localStorage = {
   getItem(key) { return store.has(key) ? store.get(key) : null; },
   setItem(key, value) { store.set(key, String(value)); },
   removeItem(key) { store.delete(key); },
+  key(i) { return [...store.keys()][i] ?? null; },
+  get length() { return store.size; },
 };
 globalThis.window = { addEventListener() {} };
 function makeClassList() {
@@ -72,12 +74,14 @@ if (savedKeys.version !== 2 || savedKeys.keyMap[0] !== 'KeyZ') throw new Error('
 // Song selection owns list output, best-score persistence and the two-step start.
 const chart = { id: 'demo', title: 'Demo', artist: 'Unit Test', bpm: 180, diff: 16, jacket: 'D', lanes: 4, duration: 1000, notes: [] };
 const demoSong = { id: 'demo_song', title: 'Demo', artist: 'Unit Test', jacket: 'D', accent: '#fff', bpm: 180, duration: 1, price: 0, charts: { HD: 'demo' }, previewStartMs: 0 };
+store.set('dl_best_song_sp_demo_song', '777');
 let selectedChart = null;
 const selectState = { state: 'SELECT' };
 const SongSelect = new SongSelectController({
   D, G, CHARTS: { demo: chart }, songs: [demoSong], StateMachine: selectState, APP_STATE: { SELECT: 'SELECT' },
   AudioEngine: { prime() {} }, economy: { isSongUnlocked() { return true; }, songPrice() { return 0; }, open() {} }, startGame(value) { selectedChart = value; },
 });
+if (store.get('dl_best_song_dz_demo_song') !== '777' || store.has('dl_best_song_sp_demo_song')) throw new Error('SP best scores must move to the DZ slot');
 SongSelect.render();
 if (!D.songList.innerHTML.includes('data-select-song="demo_song"')) throw new Error('Song list render failed');
 SongSelect.setBest('demo', 12345, 'S');
@@ -120,4 +124,4 @@ if (uiG.waitingKey !== null || uiStateMachine.state !== 'SELECT') throw new Erro
 UI.navigate('main');
 if (uiStateMachine.state !== 'MENU') throw new Error('UI return navigation failed');
 
-console.log('DREAMLAND V12.10 controller smoke: PASS');
+console.log('DREAMLAND V12.11 controller smoke: PASS');

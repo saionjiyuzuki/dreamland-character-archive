@@ -192,6 +192,26 @@ export function createNoteRenderer(D:any, Layout:{w:number;h:number}) {
   };
 }
 
+/** Key beams: a light column rising from the judge line in each lane that was just pressed, fading over 180ms. */
+export function drawLaneBeams(c:CanvasRenderingContext2D, flashAt:ArrayLike<number>, now:number, g:{w:number;cx:number;horizonY:number;judgeY:number;lanes:number}):void {
+  const dur=180, kTop=.58, lanes=Math.max(1,g.lanes);
+  const yT=g.horizonY+(g.judgeY-g.horizonY)*kTop;
+  c.save();
+  c.globalCompositeOperation='lighter';
+  for(let i=0;i<flashAt.length&&i<Math.ceil(lanes);i++){
+    const age=now-Number(flashAt[i]);
+    if(!(age>=0&&age<dur)) continue;
+    const a=1-age/dur, xl=g.w*i/lanes, xr=g.w*(i+1)/lanes;
+    const grad=c.createLinearGradient(0,g.judgeY,0,yT);
+    grad.addColorStop(0,`rgba(196,181,253,${(.38*a).toFixed(3)})`);
+    grad.addColorStop(1,'rgba(196,181,253,0)');
+    c.globalAlpha=1; c.fillStyle=grad;
+    c.beginPath(); c.moveTo(xl,g.judgeY); c.lineTo(xr,g.judgeY);
+    c.lineTo(g.cx+(xr-g.cx)*kTop,yT); c.lineTo(g.cx+(xl-g.cx)*kTop,yT); c.closePath(); c.fill();
+  }
+  c.restore();
+}
+
 export function renderLanes(deps:RendererDeps):void {
   const {D, Layout, G, PERSP, visualPerspective, visualLaneCount}=deps;
   const w = Layout.w, h = Layout.h;

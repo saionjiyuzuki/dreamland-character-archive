@@ -318,7 +318,7 @@ export class EconomyService {
     }
     const cards=SONGS.map(song=>this.shopSongCard(song)).join('');
     const promo=this.data.premiumPass?'':`<button type="button" class="shop-promo" data-economy-open="pass"><small>V-PASS ${PASS_SEASON.code}</small><strong>高级通行证 · 6 款高级音符与打击特效</strong><span>✧ ${PREMIUM_PASS_PRICE} Crystal 解锁 · 前往通行证 ›</span></button>`;
-    return `${tabs}${promo}<p class="shop-lead">使用 Crystal 解锁曲目，一次解锁包含 EZ / HD / EX / SP 全部难度。Crystal 来自等级提升、V-PASS 里程碑与每日任务。</p><div class="shop-grid songs">${cards}</div>`;
+    return `${tabs}${promo}<p class="shop-lead">使用 Crystal 解锁曲目，一次解锁包含 EZ / HD / EX / DZ 全部难度。Crystal 来自等级提升、V-PASS 里程碑与每日任务。</p><div class="shop-grid songs">${cards}</div>`;
   }
   private shopSongCard(song:SongEntry){
     const owned=this.isSongUnlocked(song.id);
@@ -328,13 +328,13 @@ export class EconomyService {
   }
   private toggleShopPreview(id:string){
     const song=findSong(id),p=this.opts.preview;if(!song||!p)return;
-    const url=this.opts.audioUrl?.(song.charts.SP||Object.values(song.charts)[0]||'');if(!url)return;
+    const url=this.opts.audioUrl?.(song.charts.DZ||Object.values(song.charts)[0]||'');if(!url)return;
     if(p.current===url)p.stop();else void p.play(url,song.previewStartMs);
   }
   private syncShopPreview(){
     const url=this.opts.preview?.current||'';
     document.querySelectorAll<HTMLElement>('[data-shop-preview]').forEach(btn=>{
-      const song=findSong(btn.dataset.shopPreview||''),mine=!!song&&!!url&&this.opts.audioUrl?.(song.charts.SP||Object.values(song.charts)[0]||'')===url;
+      const song=findSong(btn.dataset.shopPreview||''),mine=!!song&&!!url&&this.opts.audioUrl?.(song.charts.DZ||Object.values(song.charts)[0]||'')===url;
       btn.textContent=mine?'❚❚':'▶';btn.closest('.shop-card')?.classList.toggle('listening',mine);
     });
   }

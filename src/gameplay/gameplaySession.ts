@@ -1,4 +1,5 @@
 import type { AppState, PauseReason, Chart } from '../core/types.js';
+import { resetGauge } from './lifeGauge.js';
 
 export interface GameplaySessionDeps {
   G: any;
@@ -29,6 +30,7 @@ export interface GameplaySessionDeps {
   updateProgress:(t:number)=>void;
   checkEnd:(t:number)=>void;
   renderKeybinds:()=>void;
+  updateUI:()=>void;
 }
 
 export class GameplaySession {
@@ -57,12 +59,12 @@ export class GameplaySession {
     G.visualJudgeY=this.d.Layout.h*prof.judgeRatio;
     this.d.updateLaneUI(G.laneCount); G.fallTime=this.d.computeFallTime(G.speed);
     G.autoUsed=false;G.auto=false;D.autoBtn.classList.remove('active');
-    G.score=0;G.combo=0;G.maxCombo=0;G.pure=0;G.great=0;G.far=0;G.lost=0;G.timingStats={early:0,late:0,earlySum:0,lateSum:0,count:0,sum:0};G.active=[];G.holding.clear();G.multiHoldPointers?.clear?.();G.lastScore='';G.lastCombo='';
+    G.score=0;G.combo=0;G.maxCombo=0;G.pure=0;G.great=0;G.far=0;G.lost=0;G.timingStats={early:0,late:0,earlySum:0,lateSum:0,count:0,sum:0};G.active=[];G.holding.clear();G.multiHoldPointers?.clear?.();G.lastScore='';G.lastCombo='';G.lastAcc='';G.lastHp='';resetGauge(G);
     this.d.loadChart(chart);
     G.audioStarted=false;G.preludeMs=this.computePreludeMs();if(G.audioStartTimer){clearTimeout(G.audioStartTimer);G.audioStartTimer=null;}
     D.gameplay.classList.add('active');D.keysContainer.classList.add('show');D.pauseBtn.classList.add('show');D.autoBtn.classList.add('show');D.autoBtn.classList.toggle('active',G.auto);
     D.pauseMask.classList.remove('show','user-mode','visibility-mode','system-mode');this.d.renderer.resize();this.d.renderer.clear();D.judgments.innerHTML='';
-    D.combo.textContent='0';D.combo.classList.remove('show');D.combo.style.transform='translate(-50%,-50%) scale(1)';D.score.textContent='0000000';D.hudSpeed.textContent=G.speed.toFixed(1);D.progressFill.style.width='0%';
+    D.combo.textContent='0';D.combo.classList.remove('show');D.combo.style.transform='translate(-50%,-50%) scale(1)';D.score.textContent='0000000';D.hudSpeed.textContent=G.speed.toFixed(1);D.progressFill.style.width='0%';G.laneFlashAt=[];this.d.updateUI();
     this.d.visiblePage(null);
     this.d.renderLanes();this.d.GameClock.start(-G.preludeMs);
     if(G.rafId)cancelAnimationFrame(G.rafId);G.rafId=requestAnimationFrame(()=>this.loop());

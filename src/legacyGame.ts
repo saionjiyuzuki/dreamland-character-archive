@@ -7,7 +7,7 @@ import { CHARTS } from './data/charts.js';
 import { CHARACTERS } from './data/characters.js';
 import { STORY } from './data/story.js';
 import { AUDIO_SOURCES_TEST } from './data/audioMap.js';
-import { createNoteRenderer, renderLanes as renderLanesImpl } from './render/renderer.js';
+import { createNoteRenderer, renderLanes as renderLanesImpl, drawLaneBeams } from './render/renderer.js';
 import { HitEffectLayer } from './render/hitEffects.js';
 import { activeHitEffect } from './cosmetics/catalog.js';
 import { GameplaySession } from './gameplay/gameplaySession.js';
@@ -28,6 +28,7 @@ import { sampleMultiHoldPath } from './chart/holdPath.js';
 import { buildMultiHoldOccupations, resolveMultiHoldConflicts } from './runtime/LaneOccupation.js';
 import type { MultiHoldNote } from './chart/multiHoldSchema.js';
 import { backdropShapes, drawTrackBackdrop } from './render/trackBackdrop.js';
+import { GAUGE, gaugeValue, liveAccuracy } from './gameplay/lifeGauge.js';
 
 
 /* ── 3D 透视参数 ── */
@@ -99,6 +100,7 @@ const D = {
   judgments:$('#judgmentsContainer'),
   combo:$('#comboDisplay'), score:$('#scoreDisplay'),
   hudSpeed:$('#hudSpeed'), hudLanes:$('#hudLanes'), progressFill:$('#progressFill'),
+  acc:$('#accDisplay'), gauge:$('#hudGauge'), gaugeFill:$('#gaugeFill'), gaugeValue:$('#gaugeValue'),
   keysContainer:$('#keysContainer'),
   songList:$('#songList'), charGrid:$('#charGrid'),
   storyTitle:$('#storyTitle'), storyContent:$('#storyContent'),
@@ -126,7 +128,7 @@ const G = {
   totalNotes:0, remaining:0, songEnd:0,
   pending:[], pendingIndex:0, active:[], holding:new Map(), multiHoldPointers:new Map(),
   rafId:null, driftTimer:null, laneTransitionRaf:0, loadingToken:0, audioStartTimer:null, audioStarted:false, audioStallTimer:null,
-  lastScore:'', lastCombo:'', preludeMs:900, storyIdx:0, auto:false, autoUsed:false, laneMode:DEFAULT_LANE_COUNT, keyMap:[...DEFAULT_KEY_MAP], keyMapCustom:false, waitingKey:null
+  laneFlashAt:[], lastScore:'', lastCombo:'', lastAcc:'', lastHp:'', preludeMs:900, storyIdx:0, auto:false, autoUsed:false, laneMode:DEFAULT_LANE_COUNT, keyMap:[...DEFAULT_KEY_MAP], keyMapCustom:false, waitingKey:null
 };
 
 const Layout = { w:0, h:0,
@@ -381,7 +383,7 @@ let JudgeSystemImpl: JudgeSystem;
 
 const GameSession = new GameplaySession({
   G,D,Layout,GameClock,AudioEngine,AudioSync,StateMachine,APP_STATE,PAUSE_REASON,renderer:NoteRenderer,renderLanes,triggerLaneTransition,visiblePage,showResult,
-  laneCountAtTime,perspectiveProfile,updateLaneUI,computeFallTime,noteUnitCount,loadChart,updateSpawn,updateNotes,updateAuto,updateMiss,updateHolds,updateProgress,checkEnd,renderKeybinds,
+  laneCountAtTime,perspectiveProfile,updateLaneUI,computeFallTime,noteUnitCount,loadChart,updateSpawn,updateNotes,updateAuto,updateMiss,updateHolds,updateProgress,checkEnd,renderKeybinds,updateUI,
 });
 
 AudioEngine.setHooks?.({
@@ -549,6 +551,7 @@ function updateNotes(gameT){
   // Chart-specific decorative geometry, painted first so every note stays on top of it.
   const backdrop=G.chart?.backdrop;
   if(backdrop)drawTrackBackdrop(c,backdropShapes(t,{kind:backdrop.kind,bpm:Number(G.chart.bpm)||0,firstBeatMs:Number(backdrop.firstBeatMs)+(Number(G.offset)||0)},{w,cx,horizonY,judgeY,fallTime}));
+  drawLaneBeams(c,G.laneFlashAt,performance.now(),{w,cx,horizonY,judgeY,lanes:lcVisual});
   const taps=[],holds=[],ticks=[],multiHolds=[];
 
   for(let i=G.active.length-1;i>=0;i--){
@@ -717,6 +720,7 @@ function onPointerUp(id){
 function flashLane(lane){
   const keys = D.keysContainer.querySelectorAll('.key');
   const key = keys[lane];
+  G.laneFlashAt[lane] = performance.now();
   if (!key) return;
   key.classList.add('active');
   setTimeout(() => key.classList.remove('active'), 90);
@@ -728,7 +732,27 @@ function updateUI(){
   if (s !== G.lastScore){ G.lastScore = s; D.score.textContent = s; }
 
   const c = String(G.combo);
-  if (c !== G.lastCombo){ G.lastCombo = c; D.combo.textContent = c; }
+  if (c !== G.lastCombo){
+    const rose = G.combo > (Number(G.lastCombo) || 0);
+    G.lastCombo = c; D.combo.textContent = c;
+    if (rose && G.combo > 1) D.combo.animate?.([{transform:'translate(-50%,-50%) scale(1.16)'},{transform:'translate(-50%,-50%) scale(1)'}],{duration:140,easing:'ease-out'});
+  }
+
+  // Live accuracy over the units judged so far.
+  const acc = (liveAccuracy(G) * 100).toFixed(2);
+  if (acc !== G.lastAcc){ G.lastAcc = acc; if (D.acc) D.acc.textContent = acc; }
+
+  // Life gauge: CLEAR tint at or above the clear line, danger below GAUGE.dangerBelow, locked once it empties.
+  const hp = gaugeValue(G), hpKey = G.hpFailed ? 'F' : hp.toFixed(1);
+  if (hpKey !== G.lastHp && D.gauge){
+    G.lastHp = hpKey;
+    D.gaugeFill.style.width = hp.toFixed(1) + '%';
+    D.gaugeValue.textContent = G.hpFailed ? 'FAILED' : String(Math.floor(hp));
+    D.gauge.setAttribute('aria-valuenow', String(Math.round(hp)));
+    D.gauge.classList.toggle('clear', !G.hpFailed && hp >= GAUGE.clearAt);
+    D.gauge.classList.toggle('failed', !!G.hpFailed);
+    D.gameplay.classList.toggle('hp-danger', !G.hpFailed && hp < GAUGE.dangerBelow);
+  }
 
   if (G.combo > 0){ D.combo.classList.add('show'); }
   else { D.combo.classList.remove('show'); }

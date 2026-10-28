@@ -21,9 +21,9 @@ test('start.command rebuilds before serving', async () => {
   assert.ok(code.indexOf('npm run build') < code.indexOf('python3 "$ROOT/scripts/serve.py"'));
 });
 
-test('visible app version is V12.10.0', async () => {
+test('visible app version is V12.11.0', async () => {
   const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
-  assert.match(html, /DREAMLAND[^<]*V12\.10\.0/i);
+  assert.match(html, /DREAMLAND[^<]*V12\.11\.0/i);
 });
 
 test('V-PASS is rendered by the economy service, not patched by a DOM observer', async () => {

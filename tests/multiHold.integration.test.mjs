@@ -75,9 +75,9 @@ test('missed Multi Hold head becomes LOST and still resolves every scheduled tic
 
 import { CHARTS } from '../dist/data/charts.js';
 import { AUDIO_SOURCES_TEST } from '../dist/data/audioMap.js';
-test('the real song list ships Multi Hold in the Last Dance SP chart with its audio source',()=>{
-  const chart=CHARTS.song_sp_last_dance;
-  assert.ok(chart,'Last Dance SP should be selectable in the integrated game');
+test('the real song list ships Multi Hold in the Last Dance DZ chart with its audio source',()=>{
+  const chart=CHARTS.song_dz_last_dance;
+  assert.ok(chart,'Last Dance DZ should be selectable in the integrated game');
   assert.deepEqual([...new Set(chart.laneSections.map(section=>section[2]))].sort(),[4,6,8]);
   assert.ok(chart.notes.filter(note=>!Array.isArray(note)&&note.type==='multiHold').length>0);
   assert.ok(AUDIO_SOURCES_TEST[chart.id]);

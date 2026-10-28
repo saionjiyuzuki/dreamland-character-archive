@@ -28,20 +28,20 @@ test('output latency falls back to outputLatency + baseLatency', () => {
 
 test('pre-roll start is scheduled ahead by latency so the downbeat is heard at game time 0', async () => {
   const c=FakeCtx.last;
-  const a=await AudioEngine.start('song_sp_last_dance',-2000);
+  const a=await AudioEngine.start('song_dz_last_dance',-2000);
   const [when,offset]=c.sources.at(-1).starts[0];
   near(offset,0); near(when,10+2-0.06);
   // At scheduling time the audible song position is exactly the game time.
-  near(AudioEngine.currentPositionSec('song_sp_last_dance')*1000,-0 + 0, 1e-6);
-  assert.equal(a.songId,'song_sp_last_dance');
+  near(AudioEngine.currentPositionSec('song_dz_last_dance')*1000,-0 + 0, 1e-6);
+  assert.equal(a.songId,'song_dz_last_dance');
 });
 
 test('mid-song resume renders ahead by latency and reads game time lazily', async () => {
   const c=FakeCtx.last; let reads=0;
-  await AudioEngine.start('song_sp_last_dance',()=>{reads++;return 30000;});
+  await AudioEngine.start('song_dz_last_dance',()=>{reads++;return 30000;});
   const [when,offset]=c.sources.at(-1).starts[0];
   assert.equal(reads,1); near(when,10); near(offset,30.06);
-  near(AudioEngine.currentPositionSec('song_sp_last_dance'),30);
+  near(AudioEngine.currentPositionSec('song_dz_last_dance'),30);
 });
 
 test('pause/stop fade out instead of hard-cutting', async () => {

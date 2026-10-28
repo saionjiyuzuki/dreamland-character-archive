@@ -1,3 +1,4 @@
+import { clearState, gaugeValue } from '../gameplay/lifeGauge.js';
 /** Rounded Early/Late summary. Averages are null when there is nothing to average (e.g. AUTO play). */
 export function summarizeTiming(stats) {
     const s = stats || { early: 0, late: 0, earlySum: 0, lateSum: 0, count: 0, sum: 0 };
@@ -47,6 +48,9 @@ export class ResultController {
         D.rCombo.textContent = String(G.maxCombo);
         D.rScore.textContent = finalScore.toLocaleString();
         this.setText('rAccuracy', (accuracy * 100).toFixed(2) + '%');
+        const clear = clearState(G);
+        this.setText('rClear', `${clear} · LIFE ${Math.floor(gaugeValue(G))}`);
+        document.getElementById('rClear')?.classList.toggle('failed', clear === 'FAILED');
         this.renderCharacter(G.char);
         this.renderTiming(G.timingStats);
         let rewardLine = document.getElementById('resultRewards');

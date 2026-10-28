@@ -1,7 +1,7 @@
 import type { MultiHoldNote } from '../chart/multiHoldSchema.js';
 
 export type NoteKind = 'tap' | 'hold';
-export type DifficultyKey = 'EZ' | 'HD' | 'EX' | 'SP';
+export type DifficultyKey = 'EZ' | 'HD' | 'EX' | 'DZ';
 export type LaneSection = [startMs:number,endMs:number,lanes:number];
 export type HoldPathPoint = [offsetMs:number,lane:number];
 export type RawNote = [timeMs:number,kind:NoteKind,lane:number,durationMs:number,density:number,path?:HoldPathPoint[]];

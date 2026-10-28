@@ -8,17 +8,18 @@ const { sampleMultiHoldPath } = await import('../dist/chart/holdPath.js');
 const { checkChart } = await import('../scripts/charts/playability.mjs');
 const { backdropShapes } = await import('../dist/render/trackBackdrop.js');
 
-const chart = CHARTS.song_sp_last_dance;
+const chart = CHARTS.song_dz_last_dance;
 
-test('Last Dance SP20 is in the song list with its audio', () => {
+test('Last Dance DZ22 is in the song list with its audio', () => {
   assert.ok(chart, 'chart registered');
-  assert.equal(chart.diff, 20);
+  assert.equal(chart.diff, 22);
+  assert.equal(chart.difficulty, 'DZ');
   assert.equal(chart.bpm, 175);
-  const url = AUDIO_SOURCES_TEST.song_sp_last_dance;
+  const url = AUDIO_SOURCES_TEST.song_dz_last_dance;
   assert.ok(url && fs.existsSync(new URL('../' + url.replace('./', ''), import.meta.url)), 'audio file exists');
 });
 
-test('Last Dance SP20 uses every performance form', () => {
+test('Last Dance DZ22 uses every performance form', () => {
   const kinds = new Set(chart.laneSections.map(s => s[2]));
   for (const k of [4, 6, 8]) assert.ok(kinds.has(k), `${k}K section`);
   const holds = chart.notes.filter(n => Array.isArray(n) && n[1] === 'hold');
@@ -27,7 +28,7 @@ test('Last Dance SP20 uses every performance form', () => {
   assert.ok(chart.notes.filter(n => !Array.isArray(n) && n.type === 'multiHold').length >= 8, 'multi holds');
 });
 
-test('Last Dance SP20 passes the playability rules (no awkward hand patterns)', () => {
+test('Last Dance DZ22 passes the playability rules (no awkward hand patterns)', () => {
   const { violations, stats } = checkChart(chart, { sampleMultiHold: sampleMultiHoldPath });
   assert.deepEqual(violations, []);
   assert.ok(stats.maxActive <= 2);

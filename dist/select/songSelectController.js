@@ -16,6 +16,24 @@ function writeJSON(key, value) { try {
     localStorage.setItem(key, JSON.stringify(value));
 }
 catch { /* optional */ } }
+/** V12.11 renamed the SP slot to DZ: carry best scores / grades of song_sp_<song> over to song_dz_<song>. */
+function migrateSpScores() {
+    try {
+        const keys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && /^dl_best(grade)?_song_sp_/.test(k))
+                keys.push(k);
+        }
+        for (const k of keys) {
+            const to = k.replace('_song_sp_', '_song_dz_'), v = localStorage.getItem(k) || '';
+            if (localStorage.getItem(to) === null)
+                localStorage.setItem(to, v);
+            localStorage.removeItem(k);
+        }
+    }
+    catch { /* best scores are optional when storage is unavailable */ }
+}
 /**
  * Song select: song list, detail panel with difficulty picker, looping preview, and a confirmation step
  * before a chart starts (click a song to select it, click it again or press 开始演奏 to confirm).
@@ -32,6 +50,7 @@ export class SongSelectController {
     previewTimer = null;
     constructor(d) {
         this.d = d;
+        migrateSpScores();
         const p = readJSON(PREFS_KEY, {});
         if (p.song && d.songs.some(s => s.id === p.song))
             this.songId = p.song;
@@ -83,7 +102,7 @@ export class SongSelectController {
         if (song.charts[this.diff])
             return this.diff;
         const at = DIFFICULTIES.indexOf(this.diff);
-        return [...DIFFICULTIES].sort((a, b) => Math.abs(DIFFICULTIES.indexOf(a) - at) - Math.abs(DIFFICULTIES.indexOf(b) - at)).find(k => song.charts[k]) || 'SP';
+        return [...DIFFICULTIES].sort((a, b) => Math.abs(DIFFICULTIES.indexOf(a) - at) - Math.abs(DIFFICULTIES.indexOf(b) - at)).find(k => song.charts[k]) || 'DZ';
     }
     visibleSongs() {
         let list = this.d.songs.slice();
@@ -220,7 +239,7 @@ export class SongSelectController {
             this.previewTimer = null;
             if (this.d.StateMachine.state !== this.d.APP_STATE.SELECT)
                 return;
-            const chartId = song.charts.SP || Object.values(song.charts)[0];
+            const chartId = song.charts.DZ || Object.values(song.charts)[0];
             const url = chartId ? this.d.audioUrl?.(chartId) : undefined;
             if (url)
                 void this.d.preview?.play(url, song.previewStartMs);

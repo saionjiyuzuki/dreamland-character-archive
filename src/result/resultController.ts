@@ -1,4 +1,5 @@
 import type { AppState } from '../core/types.js';
+import { clearState, gaugeValue } from '../gameplay/lifeGauge.js';
 
 export interface ResultControllerDeps {
   D: any;
@@ -58,6 +59,9 @@ export class ResultController {
     D.rCombo.textContent = String(G.maxCombo);
     D.rScore.textContent = finalScore.toLocaleString();
     this.setText('rAccuracy', (accuracy * 100).toFixed(2) + '%');
+    const clear = clearState(G);
+    this.setText('rClear', `${clear} · LIFE ${Math.floor(gaugeValue(G))}`);
+    document.getElementById('rClear')?.classList.toggle('failed', clear === 'FAILED');
     this.renderCharacter(G.char);
     this.renderTiming(G.timingStats);
     let rewardLine = document.getElementById('resultRewards');

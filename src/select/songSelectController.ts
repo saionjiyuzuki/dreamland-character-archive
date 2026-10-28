@@ -28,6 +28,18 @@ function readJSON<T>(key: string, fallback: T): T {
   try { const v = JSON.parse(localStorage.getItem(key) || 'null'); return v ?? fallback; } catch { return fallback; }
 }
 function writeJSON(key: string, value: unknown): void { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* optional */ } }
+/** V12.11 renamed the SP slot to DZ: carry best scores / grades of song_sp_<song> over to song_dz_<song>. */
+function migrateSpScores(): void {
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && /^dl_best(grade)?_song_sp_/.test(k)) keys.push(k); }
+    for (const k of keys) {
+      const to = k.replace('_song_sp_', '_song_dz_'), v = localStorage.getItem(k) || '';
+      if (localStorage.getItem(to) === null) localStorage.setItem(to, v);
+      localStorage.removeItem(k);
+    }
+  } catch { /* best scores are optional when storage is unavailable */ }
+}
 
 /**
  * Song select: song list, detail panel with difficulty picker, looping preview, and a confirmation step
@@ -44,6 +56,7 @@ export class SongSelectController {
   private previewTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private readonly d: SongSelectDeps) {
+    migrateSpScores();
     const p = readJSON<{ song?: string; diff?: string; filter?: string; sort?: string; preview?: boolean }>(PREFS_KEY, {});
     if (p.song && d.songs.some(s => s.id === p.song)) this.songId = p.song;
     if (DIFFICULTIES.includes(p.diff as DifficultyKey)) this.diff = p.diff as DifficultyKey;
@@ -77,7 +90,7 @@ export class SongSelectController {
   private diffFor(song: SongEntry): DifficultyKey {
     if (song.charts[this.diff]) return this.diff;
     const at = DIFFICULTIES.indexOf(this.diff);
-    return [...DIFFICULTIES].sort((a, b) => Math.abs(DIFFICULTIES.indexOf(a) - at) - Math.abs(DIFFICULTIES.indexOf(b) - at)).find(k => song.charts[k]) || 'SP';
+    return [...DIFFICULTIES].sort((a, b) => Math.abs(DIFFICULTIES.indexOf(a) - at) - Math.abs(DIFFICULTIES.indexOf(b) - at)).find(k => song.charts[k]) || 'DZ';
   }
   private visibleSongs(): SongEntry[] {
     let list = this.d.songs.slice();
@@ -198,7 +211,7 @@ export class SongSelectController {
     this.previewTimer = setTimeout(() => {
       this.previewTimer = null;
       if (this.d.StateMachine.state !== this.d.APP_STATE.SELECT) return;
-      const chartId = song.charts.SP || Object.values(song.charts)[0];
+      const chartId = song.charts.DZ || Object.values(song.charts)[0];
       const url = chartId ? this.d.audioUrl?.(chartId) : undefined;
       if (url) void this.d.preview?.play(url, song.previewStartMs);
     }, PREVIEW_DELAY_MS);
