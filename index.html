@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<title>DREAMLAND · V12.8.1 Code Optimization</title>
+<title>DREAMLAND · V12.12.0</title>
 <style>
 :root{
   --bg:#04040a;
@@ -43,6 +43,8 @@ html,body{
 }
 
 .app{width:min(100vw,1440px);height:100dvh;margin:0 auto;position:relative;overflow:hidden;background:#04040a}
+/* 网页全屏：去掉 1440px 宽度上限，铺满整个浏览器窗口 */
+body.web-fullscreen .app{width:100vw;max-width:none}
 .screen{position:absolute;inset:0;overflow:hidden}
 
 /* ══════════════════════════════════════════════════
@@ -1000,6 +1002,7 @@ html,body{
           <button type="button" data-economy-open="missions" aria-label="每日任务" title="每日任务">☑</button>
           <button type="button" data-nav="story" aria-label="剧情" title="剧情">▤</button>
           <button type="button" data-nav="settings" aria-label="设置" title="设置">⚙</button>
+          <button type="button" data-web-fullscreen aria-pressed="false" aria-label="网页全屏" title="网页全屏">⛶</button>
         </div>
       </header>
 

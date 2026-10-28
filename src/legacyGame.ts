@@ -16,6 +16,7 @@ import { ChartRuntime } from './chart/chartRuntime.js';
 import { HoldRuntime } from './gameplay/holdRuntime.js';
 import { JudgeSystem } from './judge/judgeSystem.js';
 import { UIController } from './ui/uiController.js';
+import { bindWebFullscreen } from './ui/webFullscreen.js';
 import { SettingsController, DEFAULT_KEY_MAP, keyCodeLabel } from './settings/settingsController.js';
 import { LatencyCalibration } from './settings/latencyCalibration.js';
 import { SongSelectController } from './select/songSelectController.js';
@@ -806,6 +807,7 @@ function bindEvents(){
 
 
   UI.bindEvents();
+  bindWebFullscreen();
   SongSelect.bindEvents();
   Settings.bindControls();
   new LatencyCalibration({ AudioEngine, visualOffsetMs: () => Number(G.visualOffset) || 0, apply: ms => Settings.applyOffset(ms) }).bind();
