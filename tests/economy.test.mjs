@@ -111,3 +111,12 @@ test('Last Dance SP20 is free for new and existing saves', () => {
   const { eco } = fresh({ version: 1, unlockedSongs: ['song_test_destroyer'] });
   assert.ok(eco.isSongUnlocked('song_sp_last_dance'));
 });
+
+test('songs unlock as a whole; removed songs from old saves are ignored', () => {
+  const { eco } = fresh({ version: 2, unlockedSongs: ['song_sp_disorder', 'je'] });
+  for (const k of ['ez', 'hd', 'ex', 'sp']) assert.ok(eco.isSongUnlocked(`song_${k}_last_dance`));
+  assert.equal(eco.buySong('last_dance'), false, 'already unlocked');
+  assert.equal(eco.buySong('disorder'), false, 'removed song cannot be bought');
+  assert.equal(eco.isSongUnlocked('song_sp_disorder'), true, 'stale id stays in the save but matches no song');
+  assert.equal(eco.isSongUnlocked('disorder'), false);
+});

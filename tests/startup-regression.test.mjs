@@ -21,9 +21,9 @@ test('start.command rebuilds before serving', async () => {
   assert.ok(code.indexOf('npm run build') < code.indexOf('python3 "$ROOT/scripts/serve.py"'));
 });
 
-test('visible app version is V12.9.0', async () => {
+test('visible app version is V12.10.0', async () => {
   const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
-  assert.match(html, /DREAMLAND[^<]*V12\.9\.0/i);
+  assert.match(html, /DREAMLAND[^<]*V12\.10\.0/i);
 });
 
 test('V-PASS is rendered by the economy service, not patched by a DOM observer', async () => {
@@ -42,4 +42,13 @@ test('all CSS rules live inside <style>, not as stray text in <head>', async () 
     .replace(/<[^>]+>/g, '')
     .trim();
   assert.equal(stray, '', 'text outside <style> would render as visible page text');
+});
+
+test('pass and shop are standalone pages, not a modal inside song select', async () => {
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /id="pagePass"/);
+  assert.match(html, /id="pageShop"/);
+  assert.doesNotMatch(html, /economyModal|difficultySlider/);
+  const select = html.slice(html.indexOf('id="pageSongSelect"'), html.indexOf('id="pageCharacter"'));
+  assert.doesNotMatch(select, /data-economy-open="shop"|data-buy-song/);
 });

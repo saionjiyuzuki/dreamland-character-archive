@@ -1,16 +1,16 @@
 {
-  "name": "dreamland-v12-9-0-vpass-missions",
+  "name": "dreamland-v12-10-0-song-select",
   "private": true,
   "scripts": {
     "build": "node scripts/clean-dist.mjs && tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "serve": "npm run build && python3 scripts/serve.py --directory . --port 4183",
-    "test": "npm run build >/dev/null && node --test tests/multiHold.*.test.mjs tests/startup-regression.test.mjs tests/audioEngine.test.mjs tests/latencyCalibration.test.mjs tests/resultTiming.test.mjs tests/lastDance.test.mjs tests/economy.test.mjs",
-    "smoke": "npm run build >/dev/null && node tests/runtime-smoke.mjs && node tests/controllers-smoke.mjs && node --test tests/multiHold.*.test.mjs tests/startup-regression.test.mjs tests/audioEngine.test.mjs tests/latencyCalibration.test.mjs tests/resultTiming.test.mjs tests/lastDance.test.mjs tests/economy.test.mjs"
+    "test": "npm run build >/dev/null && node --test tests/multiHold.*.test.mjs tests/startup-regression.test.mjs tests/audioEngine.test.mjs tests/latencyCalibration.test.mjs tests/resultTiming.test.mjs tests/lastDance.test.mjs tests/economy.test.mjs tests/songs.test.mjs",
+    "smoke": "npm run build >/dev/null && node tests/runtime-smoke.mjs && node tests/controllers-smoke.mjs && node --test tests/multiHold.*.test.mjs tests/startup-regression.test.mjs tests/audioEngine.test.mjs tests/latencyCalibration.test.mjs tests/resultTiming.test.mjs tests/lastDance.test.mjs tests/economy.test.mjs tests/songs.test.mjs"
   },
   "devDependencies": {
     "typescript": "^5.8.3"
   },
   "type": "module",
-  "version": "12.9.0"
+  "version": "12.10.0"
 }

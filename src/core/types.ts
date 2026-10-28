@@ -1,6 +1,7 @@
 import type { MultiHoldNote } from '../chart/multiHoldSchema.js';
 
 export type NoteKind = 'tap' | 'hold';
+export type DifficultyKey = 'EZ' | 'HD' | 'EX' | 'SP';
 export type LaneSection = [startMs:number,endMs:number,lanes:number];
 export type HoldPathPoint = [offsetMs:number,lane:number];
 export type RawNote = [timeMs:number,kind:NoteKind,lane:number,durationMs:number,density:number,path?:HoldPathPoint[]];
@@ -12,6 +13,8 @@ export interface Chart {
   laneSections?:LaneSection[];
   /** Optional decorative track background (visual only). */
   backdrop?:{kind:'geometry';firstBeatMs:number};
+  /** Song catalog entry this chart belongs to (src/data/songs.ts) and its difficulty slot. */
+  songId?:string; difficulty?:DifficultyKey;
 }
 export interface Character { id:string; name:string; emoji:string; portrait?:string; level:number; skill:string; unlocked:boolean; pureBonus?:number; farBonus?:number; farUpgrade?:boolean; scoreMul?:number; lostSafe?:boolean }
 export type AppState = 'BOOT'|'LOADING'|'MENU'|'SELECT'|'PLAYING'|'PAUSED'|'RESULT'|'ERROR_FATAL';

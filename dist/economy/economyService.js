@@ -2,6 +2,8 @@ import { DEFAULT_HIT_EFFECT, DEFAULT_NOTE_SKIN, HIT_EFFECTS, NOTE_SKINS, findHit
 import { PASS_EXP_PER_TIER, PASS_MAX_TIER, PASS_SEASON, PASS_TIERS, PREMIUM_PASS_PRICE, cosmeticSource, isCosmeticReward, passReward, rewardLabel } from './passSeason.js';
 import { DAILY_BONUS, dailyBonusReady, ensureDaily, findMission, formatCountdown, localDateKey, missionStatus, msUntilReset, recordPlay } from './dailyMissions.js';
 import { CosmeticPreview } from '../render/cosmeticPreview.js';
+import { escapeHTML, pad2 } from '../ui/html.js';
+import { DIFFICULTIES, SONGS, findSong, songChart, songOfChart } from '../data/songs.js';
 const KEY = 'dreamland_economy_v1';
 const SAVE_VERSION = 2;
 /** Validate localStorage data because it can be stale, malformed, or manually edited. */
@@ -48,12 +50,8 @@ export function normalizeSaveData(raw, base) {
         plays: integer(value.plays, base.plays),
     };
 }
-function escapeHTML(value) {
-    const entities = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
-    return String(value ?? '').replace(/[&<>"']/g, char => entities[char]);
-}
-const pad2 = (n) => String(n).padStart(2, '0');
-const FREE_SONGS = ['song_test_destroyer', 'song_test_shinwa', 'song_test_multihold', 'song_sp_last_dance'];
+const PASS_VIEWS = ['pass', 'missions', 'loadout'], SHOP_VIEWS = ['songs', 'cosmetics'];
+const toView = (v) => v === 'shop' ? 'songs' : [...PASS_VIEWS, ...SHOP_VIEWS].includes(v) ? v : 'pass';
 const COSMETICS = [
     { id: 'aura_aurora', name: '极光轨迹', desc: '判定与长条边缘呈现极光青紫色', price: 250, accent: '#7cf5e5' },
     { id: 'aura_rose', name: '星云玫瑰', desc: '粉紫色梦境主题', price: 400, accent: '#f5a7ff' },
@@ -75,23 +73,30 @@ function summarize(rewards, extra = { passExp: 0 }) {
 }
 export class EconomyService {
     toast;
+    opts;
     data;
     charts;
     view = 'pass';
+    passView = 'pass';
+    shopView = 'songs';
+    page = '';
+    focusSong = '';
     preview = new CosmeticPreview();
     previewPick = { skin: DEFAULT_NOTE_SKIN, fx: DEFAULT_HIT_EFFECT };
     timer = null;
-    constructor(charts, toast) {
+    constructor(charts, toast, opts = {}) {
         this.toast = toast;
+        this.opts = opts;
         this.charts = charts;
-        const base = { version: SAVE_VERSION, coins: 0, crystals: 0, exp: 0, level: 1, passExp: 0, passLevel: 1, premiumPass: false, claimedFree: [], claimedPremium: [], unlockedSongs: [...FREE_SONGS], ownedCosmetics: [], equippedCosmetic: 'default', equippedNoteSkin: DEFAULT_NOTE_SKIN, equippedHitEffect: DEFAULT_HIT_EFFECT, daily: ensureDaily(null), plays: 0 };
+        const base = { version: SAVE_VERSION, coins: 0, crystals: 0, exp: 0, level: 1, passExp: 0, passLevel: 1, premiumPass: false, claimedFree: [], claimedPremium: [], unlockedSongs: [], ownedCosmetics: [], equippedCosmetic: 'default', equippedNoteSkin: DEFAULT_NOTE_SKIN, equippedHitEffect: DEFAULT_HIT_EFFECT, daily: ensureDaily(null), plays: 0 };
         try {
             this.data = normalizeSaveData(JSON.parse(localStorage.getItem(KEY) || 'null'), base);
         }
         catch {
             this.data = { ...base };
         }
-        this.data.unlockedSongs = [...new Set([...FREE_SONGS, ...(this.data.unlockedSongs || [])])];
+        // V12.9 unlocked single charts; a purchased chart now unlocks its whole song (every difficulty).
+        this.data.unlockedSongs = [...new Set(this.data.unlockedSongs.map(id => songOfChart(id)?.id || id))];
         if (!this.owns(this.data.equippedNoteSkin) || !findNoteSkin(this.data.equippedNoteSkin))
             this.data.equippedNoteSkin = DEFAULT_NOTE_SKIN;
         if (!this.owns(this.data.equippedHitEffect) || !findHitEffect(this.data.equippedHitEffect))
@@ -104,8 +109,11 @@ export class EconomyService {
         localStorage.setItem(KEY, JSON.stringify(this.data));
     }
     catch { } this.refresh(); }
-    isSongUnlocked(id) { return this.data.unlockedSongs.includes(id); }
-    songPrice(chart) { return Math.max(3, Math.min(18, Math.round((Number(chart.diff) || 8) * 1.25))); }
+    setOptions(opts) { this.opts = { ...this.opts, ...opts }; this.opts.preview?.onChange(() => this.syncShopPreview()); }
+    /** Accepts a song id or any chart id of the song. */
+    isSongUnlocked(id) { const song = findSong(id) || songOfChart(id); if (!song)
+        return this.data.unlockedSongs.includes(id); return song.price <= 0 || this.data.unlockedSongs.includes(song.id); }
+    songPrice(id) { return (findSong(id) || songOfChart(id))?.price || 0; }
     grantPlayRewards(g) {
         const pure = Number(g.pure) || 0, great = Number(g.great) || 0, far = Number(g.far) || 0, lost = Number(g.lost) || 0;
         const total = Math.max(1, pure + great + far + lost);
@@ -123,7 +131,7 @@ export class EconomyService {
             levelUps++;
         }
         const passUps = this.addPassExp(exp);
-        const completed = recordPlay(this.daily(), { songId: String(g.chart?.id || ''), pure, great, far, lost, maxCombo: Number(g.maxCombo) || 0, score: Number(g.score) || 0, accuracy });
+        const completed = recordPlay(this.daily(), { songId: String(g.chart?.songId || g.chart?.id || ''), pure, great, far, lost, maxCombo: Number(g.maxCombo) || 0, score: Number(g.score) || 0, accuracy });
         this.save();
         return { coin, exp, levelUps, passUps, crystals: this.data.crystals, coins: this.data.coins, missionsCompleted: completed.map(id => findMission(id)?.title || id), claimable: this.claimableCount() };
     }
@@ -275,26 +283,37 @@ export class EconomyService {
         this.rerender();
         return true;
     }
-    buySong(id) { const chart = this.charts[id]; if (!chart)
-        return; if (this.isSongUnlocked(id)) {
-        this.toast('这首歌已经解锁');
-        return;
-    } const price = this.songPrice(chart); if (this.data.crystals < price) {
-        this.toast(`Crystal 不足：需要 ${price}`);
-        return;
-    } this.data.crystals -= price; this.data.unlockedSongs.push(id); this.save(); this.toast(`已解锁《${chart.title}》`); this.renderModal('songs'); }
+    buySong(id) {
+        const song = findSong(id) || songOfChart(id);
+        if (!song)
+            return false;
+        if (this.isSongUnlocked(song.id)) {
+            this.toast('这首歌已经解锁');
+            return false;
+        }
+        if (this.data.crystals < song.price) {
+            this.toast(`Crystal 不足：需要 ${song.price}，可通过升级、V-PASS 与每日任务获得`);
+            return false;
+        }
+        this.data.crystals -= song.price;
+        this.data.unlockedSongs.push(song.id);
+        this.save();
+        this.toast(`已解锁《${song.title}》全部难度`);
+        this.rerender();
+        return true;
+    }
     buyCosmetic(id) { const item = COSMETICS.find(x => x.id === id); if (!item)
         return; if (this.data.ownedCosmetics.includes(id)) {
         this.data.equippedCosmetic = id;
         this.applyCosmetic();
         this.save();
         this.toast(`已装备「${item.name}」`);
-        this.renderModal('cosmetics');
+        this.rerender();
         return;
     } if (this.data.coins < item.price) {
         this.toast(`Coin 不足：需要 ${item.price}`);
         return;
-    } this.data.coins -= item.price; this.data.ownedCosmetics.push(id); this.data.equippedCosmetic = id; this.applyCosmetic(); this.save(); this.toast(`购买并装备「${item.name}」`); this.renderModal('cosmetics'); }
+    } this.data.coins -= item.price; this.data.ownedCosmetics.push(id); this.data.equippedCosmetic = id; this.applyCosmetic(); this.save(); this.toast(`购买并装备「${item.name}」`); this.rerender(); }
     applyCosmetic() {
         const item = COSMETICS.find(x => x.id === this.data.equippedCosmetic);
         document.documentElement.style.setProperty('--hold', item?.accent || '#6ee7d6');
@@ -319,42 +338,64 @@ export class EconomyService {
             if (el)
                 el.textContent = String(this.data.coins);
         }
-        const wallet = document.getElementById('economyWallet');
-        if (wallet)
-            wallet.textContent = `✧ ${this.data.crystals} Crystal　 ◉ ${this.data.coins} Coin`;
+        document.querySelectorAll('[data-wallet]').forEach(el => { el.innerHTML = `<span class="w-crystal">✧ <b>${this.data.crystals}</b><small>CRYSTAL</small></span><span class="w-coin">◉ <b>${this.data.coins}</b><small>COIN</small></span>`; });
         // Red-dot badges on every entry point that leads to claimable rewards.
-        const badges = { pass: this.passClaimableCount(), missions: this.missionClaimableCount() };
+        const pass = this.passClaimableCount(), missions = this.missionClaimableCount();
+        const badges = { pass: pass + missions, missions, 'tab-pass': pass, 'tab-missions': missions };
         document.querySelectorAll('[data-economy-open],[data-eco-tab]').forEach(el => {
-            const n = badges[el.dataset.economyOpen || el.dataset.ecoTab || ''] || 0;
+            const n = (el.dataset.ecoTab ? badges['tab-' + el.dataset.ecoTab] : badges[el.dataset.economyOpen || '']) || 0;
             if (n > 0)
                 el.dataset.badge = String(n);
             else
                 delete el.dataset.badge;
         });
     }
-    /* ── Modal ── */
-    open(view = 'pass') {
-        const modal = document.getElementById('economyModal');
-        if (!modal)
+    /* ── Pages: V-PASS (pass / missions / loadout) and Shop (songs / cosmetics) ── */
+    /** Opens the page that owns `view`; `focus` highlights a song in the shop. */
+    open(view = 'pass', focus = '') {
+        const v = toView(view);
+        if (PASS_VIEWS.includes(v))
+            this.passView = v;
+        else
+            this.shopView = v;
+        this.focusSong = focus;
+        const page = PASS_VIEWS.includes(v) ? 'pass' : 'shop';
+        if (this.opts.navigate)
+            this.opts.navigate(page);
+        else
+            this.showPage(page);
+    }
+    /** Called by the UI controller whenever a menu page becomes visible. */
+    showPage(page) {
+        if (page !== 'pass' && page !== 'shop') {
+            this.hidePages();
             return;
-        modal.classList.remove('hidden');
+        }
+        if (page !== this.page) {
+            this.opts.preview?.stop();
+            this.preview.stop();
+        }
+        this.page = page;
         this.previewPick = { skin: this.data.equippedNoteSkin, fx: this.data.equippedHitEffect };
-        this.view = ''; // fresh open: re-centre the V-PASS track instead of restoring a stale scroll
-        this.renderModal(view);
+        this.render(page === 'pass' ? this.passView : this.shopView, true);
         if (!this.timer)
             this.timer = setInterval(() => this.tick(), 1000);
     }
-    close() {
-        document.getElementById('economyModal')?.classList.add('hidden');
+    hidePages() {
+        if (!this.page)
+            return;
+        this.page = '';
         this.preview.stop();
+        this.opts.preview?.stop();
         if (this.timer) {
             clearInterval(this.timer);
             this.timer = null;
         }
     }
+    pageVisible() { const el = document.getElementById(this.page === 'shop' ? 'pageShop' : 'pagePass'); return !!this.page && !!el && !el.classList.contains('hidden'); }
     tick() {
-        if (document.getElementById('economyModal')?.classList.contains('hidden')) {
-            this.close();
+        if (!this.pageVisible()) {
+            this.hidePages();
             return;
         }
         if (this.data.daily.date !== localDateKey()) {
@@ -367,29 +408,28 @@ export class EconomyService {
         if (el)
             el.textContent = formatCountdown(msUntilReset());
     }
-    rerender() { if (!document.getElementById('economyModal')?.classList.contains('hidden'))
-        this.renderModal(this.view); }
-    renderModal(view) {
-        const body = document.getElementById('economyBody');
+    rerender() { if (this.pageVisible())
+        this.render(this.view); }
+    /** @param fresh re-centre the V-PASS track instead of keeping its scroll position. */
+    render(view, fresh = false) {
+        const v = toView(view), shop = SHOP_VIEWS.includes(v);
+        const body = document.getElementById(shop ? 'shopBody' : 'passBody');
         if (!body)
             return;
         const prevView = this.view;
-        this.view = view === 'shop' ? 'cosmetics' : view;
-        if (this.view === 'loadout' && prevView !== 'loadout')
+        this.view = v;
+        if (shop)
+            this.shopView = v;
+        else
+            this.passView = v;
+        if (v === 'loadout' && prevView !== 'loadout')
             this.previewPick = { skin: this.data.equippedNoteSkin, fx: this.data.equippedHitEffect };
-        const track = body.querySelector('.vp-track'), keepScroll = prevView === this.view && track ? track.scrollLeft : null;
+        const track = body.querySelector('.vp-track'), keepScroll = !fresh && prevView === v && track ? track.scrollLeft : null;
         this.preview.stop();
-        const wallet = `<div class="eco-wallet">✧ ${this.data.crystals} Crystal <span>·</span> ◉ ${this.data.coins} Coin</div>`;
-        if (this.view === 'pass' || this.view === 'missions' || this.view === 'loadout') {
-            const content = this.view === 'pass' ? this.passHTML() : this.view === 'missions' ? this.missionsHTML() : this.loadoutHTML();
-            body.innerHTML = `${wallet}${this.progressionTabs()}${content}`;
-        }
-        else {
-            const tab = this.view === 'songs' ? 'songs' : 'cosmetics';
-            const cosmetics = COSMETICS.map(x => { const owned = this.data.ownedCosmetics.includes(x.id), equipped = this.data.equippedCosmetic === x.id; return `<article class="eco-item"><div class="eco-item-art" style="--item-accent:${x.accent}">✧</div><div class="eco-item-info"><strong>${escapeHTML(x.name)}</strong><small>${escapeHTML(x.desc)}</small><span>${owned ? '已拥有' : `◉ ${x.price} Coin`}</span></div><button data-buy-cosmetic="${x.id}">${equipped ? '已装备' : owned ? '装备' : `购买 ${x.price}`}</button></article>`; }).join('');
-            const songs = Object.values(this.charts).filter(c => !this.isSongUnlocked(c.id)).map(c => `<article class="eco-item"><div class="eco-item-art">♫</div><div class="eco-item-info"><strong>${escapeHTML(c.title)}</strong><small>${escapeHTML(c.artist)} · SP ${escapeHTML(c.diff)}</small><span>✧ ${this.songPrice(c)} Crystal</span></div><button data-buy-song="${escapeHTML(c.id)}">解锁歌曲</button></article>`).join('') || '<p class="eco-note">曲库已全部解锁。</p>';
-            body.innerHTML = `${wallet}<div class="eco-tabs"><button data-eco-tab="cosmetics" class="${tab === 'cosmetics' ? 'active' : ''}">Coin 装扮商店</button><button data-eco-tab="songs" class="${tab === 'songs' ? 'active' : ''}">Crystal 歌曲商店</button></div><div class="eco-items">${tab === 'songs' ? songs : cosmetics}</div><p class="eco-note">Coin 通过正常打歌获得，可购买外观装扮；Crystal 通过升级、V-PASS 与每日任务获得，可解锁歌曲。音符样式与打击特效在「通行证 → 装扮」中装备。数据保存在本机浏览器。</p>`;
-        }
+        if (shop)
+            body.innerHTML = this.shopHTML();
+        else
+            body.innerHTML = `${this.progressionTabs()}${v === 'pass' ? this.passHTML() : v === 'missions' ? this.missionsHTML() : this.loadoutHTML()}`;
         this.refresh();
         const canvas = body.querySelector('[data-cosmetic-preview]');
         if (canvas) {
@@ -406,10 +446,54 @@ export class EconomyService {
                     nextTrack.scrollLeft = Math.max(0, cur.offsetLeft - nextTrack.clientWidth / 2 + cur.offsetWidth / 2);
             }
         }
+        if (shop && this.focusSong) {
+            const card = body.querySelector(`[data-shop-song="${CSS.escape(this.focusSong)}"]`);
+            card?.classList.add('focus');
+            card?.scrollIntoView?.({ block: 'center' });
+            this.focusSong = '';
+        }
+        this.syncShopPreview();
+    }
+    shopHTML() {
+        const tab = (id, label, sub) => `<button data-eco-tab="${id}" class="${this.view === id ? 'active' : ''}">${label}<small>${sub}</small></button>`;
+        const tabs = `<div class="eco-tabs hub-tabs">${tab('songs', '曲目', 'SONGS · CRYSTAL')}${tab('cosmetics', '主题', 'THEMES · COIN')}</div>`;
+        if (this.view === 'cosmetics') {
+            const items = COSMETICS.map(x => { const owned = this.data.ownedCosmetics.includes(x.id), equipped = this.data.equippedCosmetic === x.id; return `<article class="shop-card theme${equipped ? ' equipped' : ''}"><div class="shop-art" style="--accent:${x.accent}">✧</div><div class="shop-info"><strong>${escapeHTML(x.name)}</strong><small>${escapeHTML(x.desc)}</small></div><div class="shop-buy"><span>${owned ? (equipped ? '使用中' : '已拥有') : `◉ ${x.price}`}</span><button type="button" data-buy-cosmetic="${x.id}" ${equipped ? 'disabled' : ''}>${equipped ? '已装备' : owned ? '装备' : '购买'}</button></div></article>`; }).join('');
+            return `${tabs}<p class="shop-lead">长条与判定的主题色，使用打歌获得的 Coin 购买。音符样式与打击特效来自 <button type="button" class="shop-link" data-economy-open="loadout">V-PASS · 装扮</button>。</p><div class="shop-grid">${items}</div>`;
+        }
+        const cards = SONGS.map(song => this.shopSongCard(song)).join('');
+        const promo = this.data.premiumPass ? '' : `<button type="button" class="shop-promo" data-economy-open="pass"><small>V-PASS ${PASS_SEASON.code}</small><strong>高级通行证 · 6 款高级音符与打击特效</strong><span>✧ ${PREMIUM_PASS_PRICE} Crystal 解锁 · 前往通行证 ›</span></button>`;
+        return `${tabs}${promo}<p class="shop-lead">使用 Crystal 解锁曲目，一次解锁包含 EZ / HD / EX / SP 全部难度。Crystal 来自等级提升、V-PASS 里程碑与每日任务。</p><div class="shop-grid songs">${cards}</div>`;
+    }
+    shopSongCard(song) {
+        const owned = this.isSongUnlocked(song.id);
+        const levels = DIFFICULTIES.map(k => { const c = songChart(song, k); return c ? `<i class="pip ${k.toLowerCase()}"><small>${k}</small>${c.diff}</i>` : ''; }).join('');
+        const action = owned ? `<button type="button" class="ghost" data-shop-play="${escapeHTML(song.id)}">去演奏 ›</button>` : `<button type="button" data-buy-song="${escapeHTML(song.id)}">解锁 · ✧ ${song.price}</button>`;
+        return `<article class="shop-card song${owned ? ' owned' : ''}" data-shop-song="${escapeHTML(song.id)}" style="--accent:${song.accent}"><div class="shop-art">${escapeHTML(song.jacket)}<button type="button" class="shop-listen" data-shop-preview="${escapeHTML(song.id)}" aria-label="试听">▶</button></div><div class="shop-info"><strong>${escapeHTML(song.title)}${song.tag ? `<em class="sel-tag ${song.tag.toLowerCase()}">${song.tag}</em>` : ''}</strong><small>${escapeHTML(song.artist)} · BPM ${Math.round(song.bpm)}</small><span class="shop-levels">${levels}</span></div><div class="shop-buy"><span>${owned ? (song.price ? '已拥有' : '免费') : `✧ ${song.price}`}</span>${action}</div></article>`;
+    }
+    toggleShopPreview(id) {
+        const song = findSong(id), p = this.opts.preview;
+        if (!song || !p)
+            return;
+        const url = this.opts.audioUrl?.(song.charts.SP || Object.values(song.charts)[0] || '');
+        if (!url)
+            return;
+        if (p.current === url)
+            p.stop();
+        else
+            void p.play(url, song.previewStartMs);
+    }
+    syncShopPreview() {
+        const url = this.opts.preview?.current || '';
+        document.querySelectorAll('[data-shop-preview]').forEach(btn => {
+            const song = findSong(btn.dataset.shopPreview || ''), mine = !!song && !!url && this.opts.audioUrl?.(song.charts.SP || Object.values(song.charts)[0] || '') === url;
+            btn.textContent = mine ? '❚❚' : '▶';
+            btn.closest('.shop-card')?.classList.toggle('listening', mine);
+        });
     }
     progressionTabs() {
-        const tab = (id, label) => `<button data-eco-tab="${id}" class="${this.view === id ? 'active' : ''}">${label}</button>`;
-        return `<div class="eco-tabs prog-tabs">${tab('pass', 'V-PASS 通行证')}${tab('missions', '每日任务')}${tab('loadout', '装扮 · 特效')}</div>`;
+        const tab = (id, label, sub) => `<button data-eco-tab="${id}" class="${this.view === id ? 'active' : ''}">${label}<small>${sub}</small></button>`;
+        return `<div class="eco-tabs hub-tabs">${tab('pass', '通行证', 'V-PASS')}${tab('missions', '每日任务', 'DAILY')}${tab('loadout', '装扮 · 特效', 'LOADOUT')}</div>`;
     }
     rewardIcon(r) {
         if (r.kind === 'coin')
@@ -500,18 +584,25 @@ export class EconomyService {
                 this.open(opener.dataset.economyOpen || 'pass');
                 return;
             }
-            if (t.closest('[data-economy-close]')) {
-                this.close();
-                return;
-            }
             const tab = t.closest('[data-eco-tab]');
             if (tab) {
-                this.renderModal(tab.dataset.ecoTab || 'cosmetics');
+                this.render(tab.dataset.ecoTab || 'pass', true);
                 return;
             }
             const song = t.closest('[data-buy-song]');
             if (song?.dataset.buySong) {
                 this.buySong(song.dataset.buySong);
+                return;
+            }
+            const listen = t.closest('[data-shop-preview]');
+            if (listen?.dataset.shopPreview) {
+                this.toggleShopPreview(listen.dataset.shopPreview);
+                return;
+            }
+            const play = t.closest('[data-shop-play]');
+            if (play?.dataset.shopPlay) {
+                this.opts.selectSong?.(play.dataset.shopPlay);
+                this.opts.navigate?.('songSelect');
                 return;
             }
             const cosmetic = t.closest('[data-buy-cosmetic]');

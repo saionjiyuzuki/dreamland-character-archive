@@ -728,7 +728,7 @@ html,body{
 @keyframes badgePulse{0%,100%{box-shadow:0 0 6px #f43f5e88}50%{box-shadow:0 0 14px #f43f5ecc}}
 .select-mission-link{cursor:pointer}.select-mission-link:hover{color:#fff}
 .prog-tabs button{flex:1;letter-spacing:.08em;font-size:11px}
-.vp-hero{position:relative;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(200px,.85fr);gap:18px;align-items:stretch;padding:20px;border:1px solid #c5d2ff35;background:linear-gradient(90deg,rgba(7,12,34,.95),rgba(12,18,51,.7)),url('./assets/vpass/vpass-season.png') center 38%/cover;overflow:hidden}
+.vp-hero{position:relative;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(200px,.85fr);gap:18px;align-items:stretch;padding:20px;border:1px solid #c5d2ff35;background:radial-gradient(ellipse at 85% 10%,rgba(240,171,252,.2),transparent 45%),radial-gradient(ellipse at 10% 100%,rgba(124,245,229,.12),transparent 50%),linear-gradient(110deg,rgba(14,19,52,.96),rgba(30,24,78,.82));overflow:hidden}
 .vp-hero::after{content:"V";position:absolute;left:44%;top:-40px;font:170px Georgia;color:#c5d3ff0a;pointer-events:none}
 .vp-hero.is-premium{border-color:#e9c97a66;box-shadow:inset 0 0 60px #fbbf2412}
 .vp-level{display:flex;align-items:baseline;gap:8px;margin:16px 0 10px}.vp-level b{font:300 46px/1 Georgia,serif;color:#f1f4ff;text-shadow:0 0 22px #a9baff66}.vp-level span{font-size:12px;color:#8f9dc8}.vp-level em{margin-left:auto;font:normal 600 9px sans-serif;letter-spacing:.2em;padding:5px 9px;border:1px solid #b9c7ff55;color:#c7d2fe}.vp-level em.premium{border-color:#fcd34d99;color:#fde68a;background:linear-gradient(100deg,#fbbf2422,#fff0)}
@@ -790,6 +790,104 @@ html,body{
 .loadout-info{min-width:0}.loadout-info strong{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500}.loadout-info small{display:block;font-size:9px;color:#93a1cb;line-height:1.5;margin-top:4px}.loadout-source{display:block;font-size:8px;color:#d6b770;margin-top:4px}
 .loadout-card button{padding:8px 0;font-size:10px;border:1px solid #b9c7ff40;background:rgba(141,160,255,.09);color:#edf0ff;cursor:pointer}.loadout-card button:disabled{opacity:.5;cursor:default}.loadout-card.equipped button{color:#7cf5e5;border-color:#7cf5e566;opacity:1}
 @media(max-width:620px){.vp-hero{grid-template-columns:1fr}.vp-showcase{min-height:150px}.vp-level b{font-size:36px}.vp-actions{flex-direction:column}.vp-board{grid-template-columns:44px minmax(0,1fr)}.vp-col{flex-basis:78px;grid-template-rows:24px 100px 100px}.vp-cell strong{font-size:10px}.daily-head{flex-direction:column;align-items:flex-start}.daily-reset{text-align:left}.daily-card,.daily-bonus{grid-template-columns:minmax(0,1fr) 72px}.daily-rewards{grid-column:1;justify-content:flex-start}.daily-card button,.daily-bonus button{grid-row:1/span 2;grid-column:2}.loadout-stage{grid-template-columns:1fr}.loadout-grid{grid-template-columns:1fr}}
+/* V12.10.0 — song select (preview, difficulty slots, confirm), standalone V-PASS & shop pages */
+#pageSongSelect{--ez:#6ee7b7;--hd:#7dd3fc;--ex:#f9a8d4;--sp:#c4b5fd}
+#pageSongSelect .select-filter-row{gap:6px;font-size:10px}
+#pageSongSelect .select-filter-row button{background:none;border:0;color:rgba(217,222,255,.5);font:inherit;letter-spacing:.16em;padding:8px 10px;cursor:pointer;position:relative}
+#pageSongSelect .select-filter-row button:hover{color:#fff}
+#pageSongSelect .select-filter-row .filter-active{color:#f1f1ff}
+#pageSongSelect .select-filter-row .filter-active::after{bottom:-6px}
+#pageSongSelect .select-filter-row .select-sort{margin-left:auto;border:1px solid rgba(217,222,255,.18)}
+.sel-list{display:flex;flex-direction:column}
+.sel-song{position:relative;display:grid;grid-template-columns:56px minmax(0,1fr) auto 112px;align-items:center;gap:14px;width:100%;min-height:74px;padding:9px 16px 9px 12px;text-align:left;color:#eef0ff;font:inherit;cursor:pointer;background:linear-gradient(100deg,rgba(20,26,65,.72),rgba(19,24,57,.42));border:1px solid rgba(205,214,255,.12);clip-path:polygon(0 0,calc(100% - 13px) 0,100% 13px,100% 100%,0 100%);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);transition:transform .2s,border-color .2s,background .2s}
+.sel-song::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);opacity:0;transition:opacity .2s}
+.sel-song:hover{transform:translateX(3px);border-color:rgba(217,222,255,.34)}
+.sel-song.active{transform:translateX(8px);background:linear-gradient(100deg,color-mix(in srgb,var(--accent) 26%,transparent),rgba(43,53,117,.32));border-color:color-mix(in srgb,var(--accent) 70%,transparent);box-shadow:inset 0 0 26px color-mix(in srgb,var(--accent) 12%,transparent),0 0 24px rgba(114,136,255,.1)}
+.sel-song.active::before{opacity:1;box-shadow:0 0 12px var(--accent)}
+.sel-song.locked .sel-copy,.sel-song.locked .sel-jacket{opacity:.62}
+.sel-jacket{width:56px;height:56px;display:grid;place-items:center;font:300 24px Georgia,serif;color:#fff;border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--accent) 45%,transparent),transparent 62%),linear-gradient(145deg,rgba(119,128,205,.22),rgba(8,13,37,.85));text-shadow:0 0 14px var(--accent)}
+.sel-copy{min-width:0}.sel-copy strong{display:flex;align-items:center;gap:7px;font-size:15px;font-weight:400;letter-spacing:.1em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sel-copy small{display:block;margin-top:6px;font-size:9px;letter-spacing:.12em;color:rgba(213,221,255,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sel-tag{font:normal 600 8px/1 system-ui,sans-serif;letter-spacing:.1em;padding:3px 5px;border:1px solid currentColor}.sel-tag.new{color:#fda4af}.sel-tag.lab{color:#5eead4}.sel-fav{font-style:normal;color:#fde68a;font-size:11px}
+.sel-pips{display:flex;gap:4px}
+.pip{font-style:normal;min-width:24px;height:22px;display:grid;place-items:center;font:600 10px/1 system-ui,sans-serif;color:var(--c);border:1px solid color-mix(in srgb,var(--c) 45%,transparent);background:rgba(8,12,34,.5)}
+.pip.ez{--c:#6ee7b7}.pip.hd{--c:#7dd3fc}.pip.ex{--c:#f9a8d4}.pip.sp{--c:#c4b5fd}
+.pip.none{opacity:.25}.pip.on{background:var(--c);color:#0b1030;box-shadow:0 0 10px color-mix(in srgb,var(--c) 60%,transparent)}
+.sel-best{text-align:right;font:11px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:rgba(230,234,255,.78)}.sel-best b{margin-right:6px;font:600 11px Georgia,serif;color:#fde68a}.sel-best span{font-size:8px;letter-spacing:.2em;color:rgba(213,221,255,.35)}
+.sel-song.locked .sel-best{color:#fcd34d;font-size:10px}
+.sel-empty{padding:40px 10px;text-align:center;font-size:11px;letter-spacing:.12em;color:rgba(213,221,255,.45)}
+.select-list-foot{display:flex;justify-content:space-between;gap:12px;padding-top:10px;font-size:8px;letter-spacing:.14em;color:rgba(217,224,255,.38)}
+.select-nav-link{cursor:pointer}.select-nav-link:hover{color:#fff}
+.sd-panel{gap:12px;overflow-y:auto!important;scrollbar-width:none}
+.sd-art{position:relative;height:clamp(120px,24vh,220px);flex:0 0 auto;overflow:hidden;border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);background:radial-gradient(ellipse at 50% 45%,color-mix(in srgb,var(--accent) 38%,transparent),transparent 34%),radial-gradient(ellipse at 50% 55%,rgba(90,102,188,.34),transparent 60%),linear-gradient(145deg,rgba(45,53,112,.55),rgba(9,13,39,.85));clip-path:polygon(0 0,calc(100% - 20px) 0,100% 20px,100% 100%,20px 100%,0 calc(100% - 20px));animation:sdIn .35s cubic-bezier(.2,.8,.2,1)}
+.sd-art .select-art-orbit{animation:sdOrbit 18s linear infinite}.sd-art .orbit-b{animation-duration:26s;animation-direction:reverse}
+.sd-jacket{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);font:300 clamp(44px,7vw,68px) Georgia,serif;color:#fff;text-shadow:0 0 28px var(--accent),0 0 60px color-mix(in srgb,var(--accent) 50%,transparent)}
+.sd-art.playing .sd-jacket{animation:sdPulse 1.2s ease-in-out infinite}
+.sd-eq{position:absolute;right:14px;bottom:14px;display:flex;align-items:flex-end;gap:3px;height:18px;opacity:0;transition:opacity .3s}.sd-eq i{width:3px;height:30%;background:var(--accent);box-shadow:0 0 6px var(--accent)}
+.sd-art.playing .sd-eq{opacity:1}.sd-art.playing .sd-eq i{animation:sdEq .9s ease-in-out infinite}.sd-eq i:nth-child(2){animation-delay:-.3s!important}.sd-eq i:nth-child(3){animation-delay:-.6s!important}.sd-eq i:nth-child(4){animation-delay:-.15s!important}.sd-eq i:nth-child(5){animation-delay:-.45s!important}
+.sd-preview,.sd-fav{position:absolute;border:1px solid rgba(230,235,255,.3);background:rgba(8,12,34,.55);color:#e9ecff;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.sd-preview{left:12px;bottom:12px;padding:6px 10px;font-size:9px;letter-spacing:.12em}.sd-preview:not(.on){opacity:.55}
+.sd-fav{right:12px;top:12px;width:30px;height:30px;font-size:15px}.sd-fav.on{color:#fde68a;border-color:#fde68a88}
+.sd-head small{font-size:9px;letter-spacing:.2em;color:rgba(215,222,255,.55)}.sd-head h2{font:300 clamp(24px,2.8vw,36px) Georgia,'Songti SC',serif;letter-spacing:.08em;margin:6px 0 4px;color:#fff}.sd-head p{margin:0;font-size:10px;letter-spacing:.12em;color:rgba(220,226,255,.6)}
+.diff-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.diff-tab{--c:#c4b5fd;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 0 8px;border:1px solid color-mix(in srgb,var(--c) 35%,transparent);background:rgba(10,14,40,.55);color:var(--c);cursor:pointer;font:inherit;transition:background .15s,transform .15s}
+.diff-tab.ez{--c:#6ee7b7}.diff-tab.hd{--c:#7dd3fc}.diff-tab.ex{--c:#f9a8d4}.diff-tab.sp{--c:#c4b5fd}
+.diff-tab small{font:600 9px system-ui,sans-serif;letter-spacing:.16em}.diff-tab b{font:300 22px Georgia,serif}
+.diff-tab:hover:not(:disabled){transform:translateY(-2px)}
+.diff-tab.active{background:linear-gradient(180deg,color-mix(in srgb,var(--c) 32%,transparent),color-mix(in srgb,var(--c) 10%,transparent));border-color:var(--c);color:#fff;box-shadow:0 0 18px color-mix(in srgb,var(--c) 35%,transparent),inset 0 -2px 0 var(--c)}
+.diff-tab:disabled{opacity:.25;cursor:default}
+.sd-diff-info{display:flex;flex-direction:column;gap:5px;padding:10px 12px;border-left:2px solid var(--diff);background:linear-gradient(90deg,color-mix(in srgb,var(--diff) 12%,transparent),transparent)}.sd-diff-info b{font-size:11px;letter-spacing:.14em;color:var(--diff)}.sd-diff-info span{font-size:10px;color:rgba(225,231,255,.66)}
+.sd-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(222,227,255,.1);border:1px solid rgba(222,227,255,.1)}
+.sd-stats div{padding:9px 8px;background:rgba(9,13,38,.82)}.sd-stats small{display:block;font-size:7px;letter-spacing:.2em;color:rgba(215,222,255,.45)}.sd-stats b{display:block;margin-top:6px;font:400 12px ui-monospace,Menlo,monospace;color:#f2f4ff;white-space:nowrap}
+.sd-grade.SS,.sd-grade.S{color:#fde68a!important}.sd-grade.A{color:#7dd3fc!important}
+.sd-start{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:5px;padding:14px 10px;border:1px solid #fff8;background:linear-gradient(100deg,var(--diff),#eef1ff);color:#0e1533;cursor:pointer;font:inherit;box-shadow:0 0 26px color-mix(in srgb,var(--diff) 45%,transparent);clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px));transition:filter .15s,transform .15s}
+.sd-start span{font-size:14px;letter-spacing:.24em;font-weight:600}.sd-start small{font-size:8px;letter-spacing:.14em;opacity:.65}
+.sd-start:hover{filter:brightness(1.08);transform:translateY(-1px)}.sd-start:disabled{opacity:.4}
+.sd-start.locked{background:linear-gradient(100deg,#fcd34d,#fff4cc);box-shadow:0 0 26px #fcd34d44}
+.select-confirm{position:absolute;inset:0;z-index:60;display:grid;place-items:center}.select-confirm.hidden{display:none}
+.sc-backdrop{position:absolute;inset:0;background:rgba(3,5,18,.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);animation:scFade .2s ease}
+.sc-panel{position:relative;width:min(460px,92%);padding:24px 26px 22px;color:#eef0ff;background:linear-gradient(150deg,rgba(28,35,84,.96),rgba(8,12,34,.97));border:1px solid color-mix(in srgb,var(--accent) 50%,transparent);box-shadow:0 30px 90px rgba(0,0,0,.5),0 0 40px color-mix(in srgb,var(--accent) 18%,transparent);clip-path:polygon(0 0,calc(100% - 22px) 0,100% 22px,100% 100%,22px 100%,0 calc(100% - 22px));animation:scPop .26s cubic-bezier(.2,.9,.25,1.1)}
+.sc-kicker{font-size:8px;letter-spacing:.3em;color:rgba(215,222,255,.55)}
+.sc-song{display:flex;align-items:center;gap:16px;margin:16px 0 14px}.sc-jacket{width:68px;height:68px;flex:0 0 68px;display:grid;place-items:center;font:300 30px Georgia,serif;border:1px solid color-mix(in srgb,var(--accent) 55%,transparent);background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--accent) 45%,transparent),transparent 62%),#0b1030;text-shadow:0 0 16px var(--accent)}
+.sc-song h3{margin:0;font:300 24px Georgia,'Songti SC',serif;letter-spacing:.06em}.sc-song p{margin:6px 0 0;font-size:10px;letter-spacing:.1em;color:rgba(220,226,255,.6)}
+.sc-diff{display:flex;align-items:baseline;gap:10px;padding:10px 14px;border:1px solid color-mix(in srgb,var(--diff) 55%,transparent);background:linear-gradient(90deg,color-mix(in srgb,var(--diff) 22%,transparent),transparent)}.sc-diff b{font:600 18px system-ui,sans-serif;color:var(--diff);letter-spacing:.1em}.sc-diff span{font-size:9px;letter-spacing:.2em;color:rgba(230,234,255,.7)}.sc-diff strong{margin-left:auto;font:300 24px Georgia,serif}
+.sc-info{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0 18px}.sc-info dt{font-size:7px;letter-spacing:.2em;color:rgba(215,222,255,.45)}.sc-info dd{margin:5px 0 0;font:12px ui-monospace,Menlo,monospace}
+.sc-actions{display:grid;grid-template-columns:1fr 1.6fr;gap:10px}.sc-actions button{padding:13px 8px;font:inherit;font-size:12px;letter-spacing:.2em;cursor:pointer;border:1px solid rgba(220,228,255,.3)}.sc-actions small{display:block;margin-top:4px;font-size:7px;letter-spacing:.2em;opacity:.6}
+.sc-cancel{background:rgba(141,160,255,.08);color:#e6eaff}.sc-go{background:linear-gradient(100deg,var(--diff),#eef1ff);color:#0e1533;font-weight:600;box-shadow:0 0 22px color-mix(in srgb,var(--diff) 40%,transparent)}.sc-go:focus-visible{outline:2px solid #fff;outline-offset:3px}
+@keyframes sdIn{from{opacity:.3;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes sdOrbit{to{transform:translate(-50%,-50%) rotate(332deg)}}
+@keyframes sdPulse{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.06)}}
+@keyframes sdEq{0%,100%{height:25%}50%{height:100%}}
+@keyframes scFade{from{opacity:0}}
+@keyframes scPop{from{opacity:0;transform:translateY(12px) scale(.96)}}
+@media(max-width:760px){.sel-song{grid-template-columns:44px minmax(0,1fr) auto;gap:10px;min-height:62px}.sel-jacket{width:44px;height:44px;font-size:19px}.sel-best{display:none}.pip{min-width:20px;height:18px;font-size:9px}.sd-stats{grid-template-columns:repeat(2,1fr)}.diff-tab b{font-size:17px}}
+@media(max-width:560px){.select-content{grid-template-rows:minmax(0,1fr) auto}.select-detail-panel.sd-panel{display:flex;border-left:0;border-top:1px solid rgba(222,227,255,.18);padding:10px 0 0;gap:8px;overflow:visible!important}.sd-art,.sd-stats,.select-difficulty-title,.sd-diff-info,.select-list-foot,.sel-pips{display:none}.sd-head h2{font-size:18px;margin:2px 0}.sd-head p{display:none}.diff-tab{padding:6px 0 5px}.diff-tab b{font-size:16px}.sd-start{margin-top:2px;padding:10px}.sd-start small{display:none}.sel-song.active,.sel-song:hover{transform:none}.sc-info{grid-template-columns:repeat(2,1fr)}}
+@media(prefers-reduced-motion:reduce){.sd-art,.sd-art *,.sc-panel,.sc-backdrop{animation:none!important}}
+
+.hub-page{padding:0!important;align-items:stretch!important;justify-content:flex-start!important;text-align:left;color:#eef0ff;isolation:isolate;overflow:hidden;background:radial-gradient(ellipse at 75% 0%,rgba(134,105,255,.22),transparent 45%),linear-gradient(130deg,#090d27,#141238 55%,#0a0c22)}
+.pass-page::before{content:"V";position:absolute;right:2%;top:40px;z-index:-1;pointer-events:none;font:italic 420px/1 Georgia,serif;color:rgba(197,211,255,.035)}
+.shop-page{background:radial-gradient(ellipse at 20% 0%,rgba(94,234,212,.16),transparent 42%),radial-gradient(ellipse at 90% 100%,rgba(253,186,116,.1),transparent 40%),linear-gradient(130deg,#071422,#0e1734 55%,#090c22)}
+.hub-top{height:68px;flex:0 0 68px;display:flex;align-items:center;gap:22px;padding:0 3.2%;border-bottom:1px solid rgba(213,220,255,.16);background:linear-gradient(90deg,rgba(7,11,34,.92),rgba(30,35,81,.5));backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.hub-brand b{display:block;font:italic 24px Georgia,serif;letter-spacing:.08em;text-shadow:0 0 18px #a9baff88}.hub-brand small{display:block;margin-top:4px;font-size:8px;letter-spacing:.2em;color:rgba(215,222,255,.5)}
+.hub-wallet{margin-left:auto;display:flex;gap:10px}.hub-wallet span{display:flex;align-items:baseline;gap:6px;padding:7px 12px;border:1px solid rgba(213,220,255,.18);background:rgba(8,12,34,.5);font-size:12px}.hub-wallet b{font:400 14px ui-monospace,Menlo,monospace}.hub-wallet small{font-size:7px;letter-spacing:.18em;color:rgba(215,222,255,.5)}.w-crystal{color:#c4b5fd}.w-coin{color:#fcd34d}
+.hub-body{flex:1;min-height:0;overflow-y:auto;padding:18px max(3.2%,calc((100% - 1180px) / 2)) 32px;scrollbar-width:thin;scrollbar-color:rgba(186,197,255,.28) transparent}
+.hub-tabs{display:flex;gap:8px;margin:0 0 16px}.hub-tabs button{flex:0 1 200px;display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:10px 16px;font-size:13px;letter-spacing:.1em;background:rgba(141,160,255,.06);border:1px solid rgba(190,205,255,.2);color:#cfd6f5;cursor:pointer}.hub-tabs button small{font-size:7px;letter-spacing:.22em;color:rgba(215,222,255,.45)}.hub-tabs button.active{background:linear-gradient(100deg,rgba(124,245,229,.16),rgba(141,160,255,.06));border-color:rgba(124,245,229,.6);color:#fff;box-shadow:inset 0 -2px 0 #7cf5e5}
+.shop-promo{display:grid;width:100%;gap:5px;padding:16px 20px;margin-bottom:14px;text-align:left;color:#fff;cursor:pointer;border:1px solid #f0abfc66;background:radial-gradient(ellipse at 92% 50%,rgba(250,204,21,.18),transparent 30%),linear-gradient(100deg,rgba(192,132,252,.32),rgba(14,20,52,.6) 70%);clip-path:polygon(0 0,calc(100% - 18px) 0,100% 18px,100% 100%,0 100%)}.shop-promo small{font-size:8px;letter-spacing:.26em;color:#f5d0fe}.shop-promo strong{font:300 18px Georgia,'Songti SC',serif;letter-spacing:.06em}.shop-promo span{font-size:10px;color:#e9d5ff}
+.shop-lead{font-size:11px;line-height:1.8;color:#aeb9dc;margin:0 0 14px}.shop-link{background:none;border:0;border-bottom:1px solid #7cf5e5;color:#7cf5e5;font:inherit;padding:0;cursor:pointer}
+.shop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}
+.shop-card{--accent:#b9c7ff;position:relative;display:grid;grid-template-columns:76px minmax(0,1fr) auto;align-items:center;gap:14px;padding:12px 14px 12px 12px;background:linear-gradient(110deg,rgba(20,28,66,.82),rgba(14,19,48,.6));border:1px solid rgba(205,214,255,.14);transition:border-color .2s,box-shadow .2s}
+.shop-card:hover{border-color:color-mix(in srgb,var(--accent) 50%,transparent)}
+.shop-card.focus{animation:shopFocus 1.6s ease 2;border-color:var(--accent)}
+.shop-card.listening{border-color:var(--accent);box-shadow:0 0 24px color-mix(in srgb,var(--accent) 25%,transparent)}
+.shop-art{position:relative;width:76px;height:76px;display:grid;place-items:center;font:300 30px Georgia,serif;color:#fff;border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--accent) 45%,transparent),transparent 62%),#0b1030;text-shadow:0 0 14px var(--accent)}
+.shop-listen{position:absolute;right:-6px;bottom:-6px;width:28px;height:28px;border-radius:50%;border:1px solid #fff9;background:rgba(8,12,34,.85);color:#fff;font-size:10px;cursor:pointer;box-shadow:0 0 12px color-mix(in srgb,var(--accent) 50%,transparent)}
+.shop-info{min-width:0}.shop-info strong{display:flex;align-items:center;gap:7px;font-size:14px;font-weight:400;letter-spacing:.08em}.shop-info small{display:block;margin-top:5px;font-size:9px;color:rgba(213,221,255,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shop-levels{display:flex;gap:4px;margin-top:8px}.shop-levels .pip{min-width:34px;gap:3px;display:flex;justify-content:center;align-items:center}.shop-levels .pip small{font-size:7px;opacity:.7}
+.shop-buy{display:flex;flex-direction:column;align-items:flex-end;gap:7px}.shop-buy span{font:12px ui-monospace,Menlo,monospace;color:#c4b5fd}.shop-card.owned .shop-buy span{color:#7cf5e5;font:10px system-ui,sans-serif;letter-spacing:.14em}
+.shop-buy button{padding:8px 14px;font-size:11px;letter-spacing:.08em;cursor:pointer;color:#0e1533;border:1px solid #fff8;background:linear-gradient(100deg,#c4b5fd,#eef1ff)}.shop-buy button.ghost{background:rgba(141,160,255,.08);color:#e6eaff;border-color:rgba(190,205,255,.3)}.shop-buy button:disabled{opacity:.5;cursor:default}
+.shop-card.theme .shop-art{font-size:26px}.shop-card.theme.equipped{border-color:#7cf5e566}
+@keyframes shopFocus{0%,100%{box-shadow:none}50%{box-shadow:0 0 0 2px var(--accent),0 0 30px color-mix(in srgb,var(--accent) 40%,transparent)}}
+.hub-page .vp-hero{margin-top:0}
+@media(max-width:620px){.hub-top{gap:12px;height:58px;flex-basis:58px}.hub-brand small{display:none}.hub-wallet span{padding:5px 8px}.hub-tabs button{flex:1;padding:8px 10px;font-size:11px}.shop-grid{grid-template-columns:1fr}.shop-card{grid-template-columns:60px minmax(0,1fr);}.shop-art{width:60px;height:60px;font-size:24px}.shop-buy{grid-column:1/-1;flex-direction:row;justify-content:space-between;align-items:center}}
 </style>
 </head>
 <body>
@@ -892,27 +990,19 @@ html,body{
         <button class="select-back" data-nav="main" aria-label="返回主菜单">‹ <span>BACK</span></button>
         <div class="select-brand"><span class="select-brand-gem">✧</span><div><strong>DREAMLAND</strong><small>SONG SELECT / 曲目选择</small></div></div>
         <div class="select-player"><span class="select-player-icon">◈</span><div><strong>PLAYER</strong><small>LV. 01&nbsp; · &nbsp;0 / 100 EXP</small></div><div class="select-exp"><i></i></div></div>
-        <div class="select-top-score"><small>BEST SCORE</small><strong>— — — — — —</strong><span>ACC  — — . — %</span></div>
+        <div class="select-top-score"><small>BEST SCORE</small><strong>— — — — — —</strong><span>RANK —</span></div>
       </div>
       <div class="select-content">
         <section class="select-library">
-          <div class="select-section-head"><div><small>YOUR MUSIC ARCHIVE</small><h1>曲目列表 <span>/ TRACKS</span></h1></div><div class="select-track-count"><b id="selectTrackCount">04</b><span>TRACKS</span></div></div>
-          <div class="select-filter-row"><span class="filter-active">ALL SONGS</span><span>NEW</span><span>FAVORITE</span><span class="select-sort">SORT&nbsp; ↕</span></div>
-          <div class="song-list" id="songList"></div>
-          <div class="select-list-foot"><span>✧ DREAM ARCHIVE</span><span>SELECT A TRACK TO START</span></div>
+          <div class="select-section-head"><div><small>YOUR MUSIC ARCHIVE</small><h1>曲目列表 <span>/ TRACKS</span></h1></div><div class="select-track-count"><b id="selectTrackCount">00</b><span>TRACKS</span></div></div>
+          <div class="select-filter-row" id="selectFilters"></div>
+          <div class="song-list sel-list" id="songList"></div>
+          <div class="select-list-foot"><span>↑ ↓ 选曲 · ← → 难度 · ENTER 开始</span><span>点击已选中的曲目再次确认</span></div>
         </section>
-        <aside class="select-detail-panel">
-          <div class="select-detail-art"><div class="select-art-orbit orbit-a"></div><div class="select-art-orbit orbit-b"></div><div class="select-art-glyph">✧</div><span class="art-caption">DREAMLAND / MUSIC</span></div>
-          <div class="select-detail-kicker"><i></i> RHYTHM ARCHIVE <i></i></div>
-          <h2>Choose your<br><em>next dream.</em></h2>
-          <p>选择一首曲目，开始这段旅程。<br>每一次演奏，都是梦境留下的回响。</p>
-          <div class="select-difficulty-title"><span>DIFFICULTY</span><i></i><small>谱面等级</small></div>
-          <div class="difficulty-glass" id="difficultyGlass"><div class="difficulty-slider-label"><span>EZ</span><span>HD</span><span>EX</span><span>SP</span></div><div class="difficulty-slider-wrap"><div class="difficulty-slider-track"></div><div class="difficulty-slider-fill" id="difficultySliderFill"></div><div class="difficulty-slider-thumb" id="difficultySliderThumb"><i></i></div><input id="difficultySlider" class="difficulty-slider" type="range" min="0" max="3" step="1" value="3" aria-label="选择难度" /></div><div class="difficulty-slider-meta"><strong id="difficultyName">SP / SPECIAL</strong><span id="difficultyLevel">当前测试曲库以 SP 谱面为主</span></div></div>
-          <div class="select-detail-note"><span>✦</span><div><b>SP / SPECIAL CHART</b><small>当前测试曲库以 SP 谱面为主</small></div></div>
-          <div class="select-bottom-mark">DREAMS ARE WAITING FOR YOU <span>✧</span></div>
-        </aside>
+        <aside class="select-detail-panel sd-panel" id="selectDetail"></aside>
       </div>
-      <div class="select-bottom-nav"><span>◈&nbsp; MUSIC</span><span>◇&nbsp; CHARACTER</span><span class="select-mission-link" data-economy-open="missions" role="button" tabindex="0">▽&nbsp; MISSION</span><span>♧&nbsp; FRIENDS</span><span class="select-version">DREAMLAND · V12.9.0</span></div>
+      <div class="select-bottom-nav"><span>◈&nbsp; MUSIC</span><span class="select-nav-link" data-nav="character" role="button" tabindex="0">◇&nbsp; CHARACTER</span><span class="select-mission-link" data-economy-open="missions" role="button" tabindex="0">▽&nbsp; MISSION</span><span class="select-nav-link" data-economy-open="loadout" role="button" tabindex="0">✺&nbsp; LOADOUT</span><span class="select-version">DREAMLAND · V12.10.0</span></div>
+      <div class="select-confirm hidden" id="selectConfirm"></div>
     </div>
 
     <!-- ═══════ 角色 ═══════ -->
@@ -976,6 +1066,18 @@ html,body{
       </div>
     </div>
 
+    <!-- ═══════ V-PASS 通行证（独立页面） ═══════ -->
+    <div class="page hidden hub-page pass-page" id="pagePass">
+      <header class="hub-top"><button class="select-back" data-nav="back" aria-label="返回">‹ <span>BACK</span></button><div class="hub-brand"><b>V-PASS</b><small>SEASON PASS · 通行证 / 每日任务 / 装扮</small></div><div class="hub-wallet" data-wallet></div></header>
+      <div class="hub-body" id="passBody"></div>
+    </div>
+
+    <!-- ═══════ 商店（独立页面） ═══════ -->
+    <div class="page hidden hub-page shop-page" id="pageShop">
+      <header class="hub-top"><button class="select-back" data-nav="back" aria-label="返回">‹ <span>BACK</span></button><div class="hub-brand"><b>DREAM SHOP</b><small>商店 · 曲目与主题</small></div><div class="hub-wallet" data-wallet></div></header>
+      <div class="hub-body" id="shopBody"></div>
+    </div>
+
     <!-- ═══════ 结算 ═══════ -->
     <div class="page result-page hidden" id="pageResult">
       <div class="result-character" aria-hidden="true">
@@ -1014,11 +1116,6 @@ html,body{
         <button class="menu-btn" id="resultBackBtn">返回选曲</button>
         </div>
       </div>
-    </div>
-
-    <div class="economy-modal hidden" id="economyModal" role="dialog" aria-modal="true" aria-label="商店与通行证">
-      <div class="economy-backdrop" data-economy-close></div>
-      <section class="economy-panel"><header><div><small>DREAMLAND / PROGRESSION</small><h2>梦境补给站</h2></div><button class="economy-close" data-economy-close aria-label="关闭">×</button></header><div id="economyBody" class="economy-body"></div><footer><span id="economyWallet">✧ 0 Crystal　 ◉ 0 Coin</span><button data-economy-close>返回游戏</button></footer></section>
     </div>
 
     <!-- ═══════ 游戏层 ═══════ -->
@@ -1068,7 +1165,6 @@ html,body{
 </div>
 
 <script type="module" src="./dist/main.js"></script>
-<script>(()=>{const s=document.getElementById('difficultySlider');if(!s)return;const n=[{short:'EZ',title:'EZ / EASY',detail:'基础难度 · 轻松熟悉节奏'},{short:'HD',title:'HD / HARD',detail:'进阶难度 · 更丰富的节奏组合'},{short:'EX',title:'EX / EXPERT',detail:'高难度 · 更复杂的交互与节奏'},{short:'SP',title:'SP / SPECIAL',detail:'当前测试曲库以 SP 谱面为主'}];const thumb=document.getElementById('difficultySliderThumb'),fill=document.getElementById('difficultySliderFill'),title=document.getElementById('difficultyName'),detail=document.getElementById('difficultyLevel'),labels=[...document.querySelectorAll('.difficulty-slider-label span')];function update(){const v=Math.max(0,Math.min(3,Number(s.value)||0)),pct=v/3*100;if(thumb)thumb.style.left=pct+'%';if(fill)fill.style.width=pct+'%';labels.forEach((e,i)=>e.classList.toggle('active',i===v));if(title)title.textContent=n[v].title;if(detail)detail.textContent=n[v].detail;document.querySelectorAll('.select-diff').forEach((e,i)=>e.classList.toggle('active',i===v));window.dispatchEvent(new CustomEvent('dreamland:difficultychange',{detail:{index:v,difficulty:n[v].short}}))}s.addEventListener('input',update);s.addEventListener('change',update);update()})();</script>
 <script>
 (()=>{
  const roster=[

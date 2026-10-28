@@ -1,4 +1,5 @@
 import { GameClock } from '../core/gameClock.js';
+import { AUDIO_SOURCES_TEST } from '../data/audioMap.js';
 export interface AudioEngineHooks { onSystemInterrupt?:()=>void; onEndedUnexpected?:()=>void; }
 type VoiceSpec={type?:OscillatorType;freqStart?:number;freqEnd?:number;freqRamp?:number;peak?:number;releaseLevel?:number;release?:number;stop?:number};
 type ActivePlayback={songId:string;url:string;source:AudioBufferSourceNode|null;gain:GainNode|null;buffer:AudioBuffer;duration:number;offsetSec:number;startAtContext:number;playbackRate:number;paused:boolean;token:number};
@@ -9,7 +10,7 @@ const FADE_SEC=.008;            // de-click ramp for pause / resume / stop
 const MAX_CACHED_BUFFERS=2;     // decoded PCM is tens of MB per song; keep mobile memory bounded
 const SFX_MERGE_SEC=.012;       // identical hit sounds closer than this (chords) are merged instead of stacked
 const MAX_EXTRAPOLATE_SEC=.1;   // cap for extrapolating a stale getOutputTimestamp()
-const AUDIO_URL=(id:string)=>({song_test_destroyer:'./public/audio/destr0yer.mp3',song_sp_destroyer:'./public/audio/destr0yer.mp3',song_test_shinwa:'./public/audio/shinwa.mp3',song_sp_shinwa:'./public/audio/shinwa.mp3',song_test_je:'./public/audio/je.mp3',song_sp_je:'./public/audio/je.mp3',song_test_disorder:'./public/audio/disorder.mp3',song_sp_disorder:'./public/audio/disorder.mp3',song_test_multihold:'./public/audio/disorder.mp3',song_sp_last_dance:'./public/audio/last-dance.flac'} as Record<string,string>)[id];
+const AUDIO_URL=(id:string):string|undefined=>AUDIO_SOURCES_TEST[id];
 export const AudioEngine={
  ctx:null as AudioContext|null, master:null as GainNode|null, sfxBus:null as GainNode|null, bgmBus:null as GainNode|null,
  ready:false, volumeValue:70,

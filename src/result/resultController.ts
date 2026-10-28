@@ -6,7 +6,7 @@ export interface ResultControllerDeps {
   StateMachine: { state: AppState; transition: (next: AppState, ctx?: any) => boolean };
   APP_STATE: Record<AppState, AppState>;
   AudioEngine: any;
-  setBest: (songId: string, score: number) => void;
+  setBest: (songId: string, score: number, grade?: string) => void;
   visiblePage: (id: string | null) => void;
   economy: { grantPlayRewards: (g:any)=>{coin:number;exp:number;levelUps:number;passUps:number;missionsCompleted?:string[];claimable?:number}; };
 }
@@ -45,12 +45,12 @@ export class ResultController {
     else if (accuracy >= 0.75) grade = 'B';
 
     const finalScore = Math.round(G.score);
-    if (G.chart && !G.autoUsed) this.d.setBest(G.chart.id, finalScore);
+    if (G.chart && !G.autoUsed) this.d.setBest(G.chart.id, finalScore, grade);
     const rewards = G.chart && !G.autoUsed ? this.d.economy.grantPlayRewards(G) : null;
 
     D.resultGrade.textContent = grade;
     D.resultGrade.className = 'result-grade ' + grade;
-    D.resultSong.textContent = (G.chart ? G.chart.title : '曲目') + ' · LV.' + (G.chart ? G.chart.diff : '?');
+    D.resultSong.textContent = (G.chart ? G.chart.title : '曲目') + ' · ' + (G.chart?.difficulty ? G.chart.difficulty + ' ' : '') + 'LV.' + (G.chart ? G.chart.diff : '?');
     D.rPure.textContent = String(G.pure);
     D.rGreat.textContent = String(G.great);
     D.rFar.textContent = String(G.far);

@@ -28,20 +28,20 @@ test('output latency falls back to outputLatency + baseLatency', () => {
 
 test('pre-roll start is scheduled ahead by latency so the downbeat is heard at game time 0', async () => {
   const c=FakeCtx.last;
-  const a=await AudioEngine.start('song_test_disorder',-2000);
+  const a=await AudioEngine.start('song_sp_last_dance',-2000);
   const [when,offset]=c.sources.at(-1).starts[0];
   near(offset,0); near(when,10+2-0.06);
   // At scheduling time the audible song position is exactly the game time.
-  near(AudioEngine.currentPositionSec('song_test_disorder')*1000,-0 + 0, 1e-6);
-  assert.equal(a.songId,'song_test_disorder');
+  near(AudioEngine.currentPositionSec('song_sp_last_dance')*1000,-0 + 0, 1e-6);
+  assert.equal(a.songId,'song_sp_last_dance');
 });
 
 test('mid-song resume renders ahead by latency and reads game time lazily', async () => {
   const c=FakeCtx.last; let reads=0;
-  await AudioEngine.start('song_test_disorder',()=>{reads++;return 30000;});
+  await AudioEngine.start('song_sp_last_dance',()=>{reads++;return 30000;});
   const [when,offset]=c.sources.at(-1).starts[0];
   assert.equal(reads,1); near(when,10); near(offset,30.06);
-  near(AudioEngine.currentPositionSec('song_test_disorder'),30);
+  near(AudioEngine.currentPositionSec('song_sp_last_dance'),30);
 });
 
 test('pause/stop fade out instead of hard-cutting', async () => {
@@ -51,12 +51,15 @@ test('pause/stop fade out instead of hard-cutting', async () => {
 });
 
 test('charts sharing one file share a single decode', async () => {
-  const before=fetches; await AudioEngine.prepare('song_sp_disorder'); await AudioEngine.prepare('song_test_multihold');
-  assert.equal(fetches,before); assert.ok(AudioEngine.isReady('song_sp_disorder'));
+  const before=fetches; await AudioEngine.prepare('song_ez_last_dance'); await AudioEngine.prepare('song_hd_last_dance');
+  assert.equal(fetches,before); assert.ok(AudioEngine.isReady('song_ez_last_dance'));
 });
 
 test('decoded buffer cache is bounded', async () => {
-  for(const id of ['song_test_je','song_test_shinwa','song_test_destroyer'])await AudioEngine.prepare(id);
+  // Only one real song ships; register throwaway ids so three distinct files go through the (faked) fetch.
+  const { AUDIO_SOURCES_TEST } = await import('../dist/data/audioMap.js');
+  const ids=['a','b','c'].map(k=>{const id=`cache_probe_${k}`;AUDIO_SOURCES_TEST[id]=`./public/audio/cache-probe-${k}.mp3`;return id;});
+  try{for(const id of ids)await AudioEngine.prepare(id);}finally{for(const id of ids)delete AUDIO_SOURCES_TEST[id];}
   assert.ok(AudioEngine.buffers.size<=2);
 });
 

@@ -25,8 +25,8 @@ function makeClassList() {
 }
 function makeElement() {
   return {
-    textContent: '', innerHTML: '', value: '', dataset: {}, className: '', style: {},
-    classList: makeClassList(), listeners: {},
+    textContent: '', innerHTML: '', value: '', dataset: {}, className: '', style: { setProperty() {} },
+    classList: makeClassList(), listeners: {}, querySelector() { return null; },
     addEventListener(type, fn) { (this.listeners[type] ||= []).push(fn); },
     appendChild(child) { this.child = child; },
     getBoundingClientRect() { return { left: 0, top: 0, width: 100, height: 100 }; },
@@ -36,6 +36,8 @@ const elements = new Map();
 globalThis.document = {
   getElementById(id) { if (!elements.has(id)) elements.set(id, makeElement()); return elements.get(id); },
   createElement() { return makeElement(); },
+  querySelector() { return null; },
+  querySelectorAll() { return []; },
   head: makeElement(),
   addEventListener() {},
 };
@@ -67,18 +69,22 @@ if (!Settings.consumeKeydown(event) || G.keyMap[0] !== 'KeyZ' || !G.keyMapCustom
 const savedKeys = JSON.parse(store.get('dreamland_sp_keys'));
 if (savedKeys.version !== 2 || savedKeys.keyMap[0] !== 'KeyZ') throw new Error('Versioned keymap persistence failed');
 
-// Song selection owns list output and best-score persistence.
+// Song selection owns list output, best-score persistence and the two-step start.
 const chart = { id: 'demo', title: 'Demo', artist: 'Unit Test', bpm: 180, diff: 16, jacket: 'D', lanes: 4, duration: 1000, notes: [] };
+const demoSong = { id: 'demo_song', title: 'Demo', artist: 'Unit Test', jacket: 'D', accent: '#fff', bpm: 180, duration: 1, price: 0, charts: { HD: 'demo' }, previewStartMs: 0 };
 let selectedChart = null;
+const selectState = { state: 'SELECT' };
 const SongSelect = new SongSelectController({
-  D, G, CHARTS: { demo: chart }, StateMachine: { state: 'SELECT' }, APP_STATE: { SELECT: 'SELECT' },
-  AudioEngine: { prime() {} }, economy: { isSongUnlocked() { return true; }, open() {}, renderModal() {} }, startGame(value) { selectedChart = value; },
+  D, G, CHARTS: { demo: chart }, songs: [demoSong], StateMachine: selectState, APP_STATE: { SELECT: 'SELECT' },
+  AudioEngine: { prime() {} }, economy: { isSongUnlocked() { return true; }, songPrice() { return 0; }, open() {} }, startGame(value) { selectedChart = value; },
 });
 SongSelect.render();
-if (!D.songList.innerHTML.includes('data-song="demo"')) throw new Error('Song list render failed');
-SongSelect.setBest('demo', 12345);
-if (SongSelect.getBest('demo') !== 12345) throw new Error('Best score persistence failed');
-SongSelect.select('demo');
+if (!D.songList.innerHTML.includes('data-select-song="demo_song"')) throw new Error('Song list render failed');
+SongSelect.setBest('demo', 12345, 'S');
+if (SongSelect.getBest('demo') !== 12345 || SongSelect.getBestGrade('demo') !== 'S') throw new Error('Best score persistence failed');
+SongSelect.requestStart();
+if (selectedChart) throw new Error('First step must only open the confirmation');
+SongSelect.confirmStart();
 if (selectedChart !== chart) throw new Error('Song selection routing failed');
 
 // Result rendering owns the score presentation and visible-page switch.
@@ -114,4 +120,4 @@ if (uiG.waitingKey !== null || uiStateMachine.state !== 'SELECT') throw new Erro
 UI.navigate('main');
 if (uiStateMachine.state !== 'MENU') throw new Error('UI return navigation failed');
 
-console.log('DREAMLAND V11.3 controller smoke: PASS');
+console.log('DREAMLAND V12.10 controller smoke: PASS');

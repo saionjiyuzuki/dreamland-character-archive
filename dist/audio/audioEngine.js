@@ -1,10 +1,11 @@
 import { GameClock } from '../core/gameClock.js';
+import { AUDIO_SOURCES_TEST } from '../data/audioMap.js';
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const FADE_SEC = .008; // de-click ramp for pause / resume / stop
 const MAX_CACHED_BUFFERS = 2; // decoded PCM is tens of MB per song; keep mobile memory bounded
 const SFX_MERGE_SEC = .012; // identical hit sounds closer than this (chords) are merged instead of stacked
 const MAX_EXTRAPOLATE_SEC = .1; // cap for extrapolating a stale getOutputTimestamp()
-const AUDIO_URL = (id) => ({ song_test_destroyer: './public/audio/destr0yer.mp3', song_sp_destroyer: './public/audio/destr0yer.mp3', song_test_shinwa: './public/audio/shinwa.mp3', song_sp_shinwa: './public/audio/shinwa.mp3', song_test_je: './public/audio/je.mp3', song_sp_je: './public/audio/je.mp3', song_test_disorder: './public/audio/disorder.mp3', song_sp_disorder: './public/audio/disorder.mp3', song_test_multihold: './public/audio/disorder.mp3', song_sp_last_dance: './public/audio/last-dance.flac' }[id]);
+const AUDIO_URL = (id) => AUDIO_SOURCES_TEST[id];
 export const AudioEngine = {
     ctx: null, master: null, sfxBus: null, bgmBus: null,
     ready: false, volumeValue: 70,

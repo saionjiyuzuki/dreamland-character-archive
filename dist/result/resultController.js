@@ -35,11 +35,11 @@ export class ResultController {
             grade = 'B';
         const finalScore = Math.round(G.score);
         if (G.chart && !G.autoUsed)
-            this.d.setBest(G.chart.id, finalScore);
+            this.d.setBest(G.chart.id, finalScore, grade);
         const rewards = G.chart && !G.autoUsed ? this.d.economy.grantPlayRewards(G) : null;
         D.resultGrade.textContent = grade;
         D.resultGrade.className = 'result-grade ' + grade;
-        D.resultSong.textContent = (G.chart ? G.chart.title : '曲目') + ' · LV.' + (G.chart ? G.chart.diff : '?');
+        D.resultSong.textContent = (G.chart ? G.chart.title : '曲目') + ' · ' + (G.chart?.difficulty ? G.chart.difficulty + ' ' : '') + 'LV.' + (G.chart ? G.chart.diff : '?');
         D.rPure.textContent = String(G.pure);
         D.rGreat.textContent = String(G.great);
         D.rFar.textContent = String(G.far);

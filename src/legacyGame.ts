@@ -21,6 +21,8 @@ import { LatencyCalibration } from './settings/latencyCalibration.js';
 import { SongSelectController } from './select/songSelectController.js';
 import { ResultController } from './result/resultController.js';
 import { EconomyService } from './economy/economyService.js';
+import { SONGS } from './data/songs.js';
+import { PreviewPlayer } from './audio/previewPlayer.js';
 import { MultiHoldAdapter } from './integration/MultiHoldAdapter.js';
 import { sampleMultiHoldPath } from './chart/holdPath.js';
 import { buildMultiHoldOccupations, resolveMultiHoldConflicts } from './runtime/LaneOccupation.js';
@@ -85,7 +87,7 @@ const FAR_W = 160;
 const $ = (s, r) => (r || document).querySelector(s);
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 
-/* AudioEngine is provided by ./audio/audioEngine.ts (single implementation; fetches public/audio/*.mp3). */
+/* AudioEngine is provided by ./audio/audioEngine.ts (single implementation; fetches the files in public/audio/). */
 
 /* ════════════ DOM ════════════ */
 const D = {
@@ -187,19 +189,23 @@ const StateMachine = {
 };
 
 
-const PAGES = ['Main', 'SongSelect', 'Character', 'Story', 'Settings', 'Result'];
+const PAGES = ['Main', 'SongSelect', 'Character', 'Story', 'Settings', 'Pass', 'Shop', 'Result'];
 UI = new UIController({
   D, G, PAGES, StateMachine, APP_STATE, CHARACTERS, STORY,
   clearWaitingKey: () => Settings.clearWaitingKey(),
+  onMenuPage: (page) => Economy?.showPage(page),
 });
 const visiblePage = (id) => UI.visiblePage(id);
 const navigateMenuPage = (page) => UI.navigateMenuPage(page);
 const toast = (msg) => UI.toast(msg);
+const Preview = new PreviewPlayer(AudioEngine);
+const audioUrl = (chartId) => AUDIO_SOURCES_TEST[chartId];
 Economy = new EconomyService(CHARTS, toast);
-SongSelect = new SongSelectController({ D, G, CHARTS, StateMachine, APP_STATE, AudioEngine, startGame, economy: Economy });
+SongSelect = new SongSelectController({ D, G, CHARTS, songs: SONGS, StateMachine, APP_STATE, AudioEngine, startGame, economy: Economy, preview: Preview, audioUrl, navigate: (page) => UI.navigate(page) });
+Economy.setOptions({ navigate: (page) => UI.navigate(page), preview: Preview, audioUrl, selectSong: (id) => SongSelect.selectSong(id) });
 Result = new ResultController({
   D, G, StateMachine, APP_STATE, AudioEngine,
-  setBest: (songId, score) => SongSelect.setBest(songId, score),
+  setBest: (songId, score, grade) => SongSelect.setBest(songId, score, grade),
   visiblePage, economy: Economy,
 });
 const showResult = () => Result.show();
@@ -209,6 +215,9 @@ Settings = new SettingsController({
 
 const StateHooks = {
   enter(state,ctx,prev){
+    // Song previews belong to song select (and the shop page, which lives in MENU).
+    if(state!==APP_STATE.SELECT) SongSelect.leave();
+    if(state!==APP_STATE.MENU) Economy.showPage('');
     switch(state){
       case APP_STATE.BOOT:
         break;
@@ -260,7 +269,7 @@ const StateHooks = {
     visiblePage('pageSongSelect');
     D.pauseMask.classList.remove('show');
     G.menuPage='songSelect'; G.page='songSelect';
-    SongSelect.render();
+    SongSelect.enter();
     if(ctx && ctx.toast) toast(ctx.toast);
   },
   enterFatal(ctx){

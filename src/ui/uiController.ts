@@ -10,11 +10,17 @@ export interface UIControllerDeps {
   STORY: any[];
   renderSongs: () => void;
   clearWaitingKey: () => void;
+  /** Notified whenever a menu page (main / pass / shop / …) becomes the visible one. */
+  onMenuPage?: (page: string) => void;
 }
+const MENU_PAGES = ['Main', 'Character', 'Story', 'Settings', 'Pass', 'Shop'];
+/** Pages that remember where they were opened from, so their back button returns there. */
+const HUB_PAGES = ['pass', 'shop'];
 
 /** Owns page visibility/navigation, lightweight story/character views, and toast UI. */
 export class UIController {
   private toastStyleReady = false;
+  private returnTo = 'main';
 
   constructor(private readonly d: UIControllerDeps) {}
 
@@ -29,7 +35,7 @@ export class UIController {
 
   navigateMenuPage(page: string): void {
     const target = String(page || 'main').toLowerCase();
-    ['Main', 'Character', 'Story', 'Settings'].forEach(name => {
+    MENU_PAGES.forEach(name => {
       const el = document.getElementById('page' + name);
       if (el) el.classList.toggle('hidden', name.toLowerCase() !== target);
     });
@@ -37,10 +43,22 @@ export class UIController {
     this.d.G.page = target;
     if (target === 'character') this.renderCharacters();
     if (target === 'story') this.renderStory();
+    this.d.onMenuPage?.(target);
   }
 
   navigate(page: string): void {
     if (this.d.G.waitingKey !== null) this.d.clearWaitingKey();
+    const state = this.d.StateMachine.state, A = this.d.APP_STATE;
+    if (page === 'back') page = this.returnTo;
+    const target = page.toLowerCase();
+    if (HUB_PAGES.includes(target) && !HUB_PAGES.includes(String(this.d.G.menuPage))) {
+      this.returnTo = state === A.SELECT ? 'songSelect' : state === A.MENU ? String(this.d.G.menuPage || 'main') : 'main';
+    }
+    // Pass / shop / character … are menu pages; reaching them from song select or the result screen goes via MENU.
+    if (page !== 'songSelect' && page !== 'main' && (state === A.SELECT || state === A.RESULT)) {
+      this.d.StateMachine.transition(A.MENU, { page: target });
+      return;
+    }
     if (page === 'songSelect') {
       if (this.d.StateMachine.state === this.d.APP_STATE.MENU ||
           this.d.StateMachine.state === this.d.APP_STATE.RESULT ||
