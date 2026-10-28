@@ -67,6 +67,8 @@ export class ResultController {
                 const lines = [`+${rewards.coin} Coin  ·  +${rewards.exp} EXP${rewards.levelUps ? `  ·  升级 ${rewards.levelUps} 级，获得 ${rewards.levelUps * 5} Crystal` : ''}${rewards.passUps ? `  ·  V-PASS +${rewards.passUps} 级` : ''}`];
                 if (rewards.missionsCompleted?.length)
                     lines.push(`每日任务完成：${rewards.missionsCompleted.join('、')}`);
+                if (rewards.premiumUnlocked)
+                    lines.push('✦ 高级通行证已解锁');
                 if (rewards.claimable)
                     lines.push(`✦ ${rewards.claimable} 项奖励待领取 · 前往「通行证」`);
                 rewardLine.textContent = lines.join('\n');

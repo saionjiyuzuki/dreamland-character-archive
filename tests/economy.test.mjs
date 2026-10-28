@@ -9,7 +9,7 @@ globalThis.document = {
 };
 
 const { EconomyService } = await import('../dist/economy/economyService.js');
-const { PASS_TIERS, PASS_MAX_TIER, PREMIUM_PASS_PRICE, passReward } = await import('../dist/economy/passSeason.js');
+const { PASS_TIERS, PASS_MAX_TIER, PREMIUM_PASS_MISSIONS, passReward } = await import('../dist/economy/passSeason.js');
 const { ensureDaily, pickMissions, recordPlay, missionStatus, localDateKey, MISSION_POOL } = await import('../dist/economy/dailyMissions.js');
 const { NOTE_SKINS, HIT_EFFECTS, activeNoteSkin, activeHitEffect } = await import('../dist/cosmetics/catalog.js');
 
@@ -23,8 +23,7 @@ test('season table: 30 tiers, Crystal milestones every 5 free tiers, basic vs pr
   const grades = (track) => PASS_TIERS.map(r => r[track]).filter(r => r.id).map(r => (NOTE_SKINS.find(s => s.id === r.id) || HIT_EFFECTS.find(e => e.id === r.id)).grade);
   assert.ok(grades('free').length >= 4 && grades('free').every(g => g === 'basic'));
   assert.ok(grades('premium').length >= 6 && grades('premium').every(g => g === 'premium'));
-  const premiumCrystal = PASS_TIERS.reduce((n, r) => n + (r.premium.kind === 'crystal' ? r.premium.amount : 0), 0);
-  assert.ok(premiumCrystal > PREMIUM_PASS_PRICE, 'premium track should pay back its unlock price');
+  assert.equal(PREMIUM_PASS_MISSIONS, 6);
 });
 
 test('tier-ups unlock rewards that must be claimed; claims are idempotent', () => {
@@ -43,13 +42,25 @@ test('tier-ups unlock rewards that must be claimed; claims are idempotent', () =
   assert.ok(eco.owns('fx_ripple'), 'tier 3 basic hit effect granted');
 });
 
-test('premium unlock costs Crystal and back-fills reached premium tiers', () => {
-  const { eco } = fresh();
+test('premium pass unlocks after 6 completed daily missions and back-fills reached premium tiers', () => {
+  const { eco, toasts } = fresh();
   eco.addPassExp(300);
-  assert.equal(eco.buyPremium(), false);
-  eco.data.crystals = PREMIUM_PASS_PRICE + 1;
-  assert.equal(eco.buyPremium(), true);
-  assert.equal(eco.data.crystals, 1);
+  const crystals = eco.data.crystals;
+  // play_3 is always among today's missions: three plays complete it.
+  for (let i = 0; i < 3; i++) eco.grantPlayRewards(play());
+  assert.ok(eco.data.missionsDone >= 1 && eco.data.missionsDone < 6);
+  assert.equal(eco.data.premiumPass, false);
+  assert.equal(eco.tierState('premium', 1), 'premiumLocked');
+  // A fresh day with play_3 one play short: the next play completes the 6th mission.
+  eco.data.missionsDone = 5;
+  eco.data.daily = ensureDaily(null);
+  eco.data.daily.progress.play_3 = 2;
+  const r = eco.grantPlayRewards(play());
+  assert.equal(r.premiumUnlocked, true);
+  assert.equal(eco.data.premiumPass, true);
+  assert.ok(toasts.some(t => t.includes('高级通行证已解锁')));
+  assert.ok(eco.data.crystals >= crystals, 'no Crystal spent');
+  assert.equal(eco.premiumMissionsLeft(), 0);
   assert.equal(eco.tierState('premium', 1), 'claimable');
   eco.claimAllPass();
   assert.ok(eco.owns('fx_nova'));
@@ -57,6 +68,18 @@ test('premium unlock costs Crystal and back-fills reached premium tiers', () => 
   assert.equal(activeHitEffect().id, 'fx_nova');
   assert.equal(eco.equip('noteSkin', 'skin_prism'), false, 'cannot equip unowned premium skin');
   assert.equal(activeNoteSkin().id, 'skin_default');
+});
+
+test('mission count persists, older saves start from today, an earned count unlocks on load', () => {
+  const { eco } = fresh();
+  eco.data.missionsDone = 4; eco.save();
+  assert.equal(fresh(JSON.parse(store.get(KEY))).eco.data.missionsDone, 4);
+  const legacy = fresh({ version: 2, coins: 0 }).eco;
+  assert.equal(legacy.data.missionsDone, 0);
+  assert.equal(legacy.data.premiumPass, false);
+  const earned = fresh({ version: 2, missionsDone: 6 }).eco;
+  assert.equal(earned.data.premiumPass, true);
+  assert.equal(fresh({ version: 2, premiumPass: true }).eco.data.premiumPass, true, 'bought passes stay active');
 });
 
 test('pass progression caps at tier 30', () => {

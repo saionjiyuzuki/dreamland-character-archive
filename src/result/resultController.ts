@@ -9,7 +9,7 @@ export interface ResultControllerDeps {
   AudioEngine: any;
   setBest: (songId: string, score: number, grade?: string) => void;
   visiblePage: (id: string | null) => void;
-  economy: { grantPlayRewards: (g:any)=>{coin:number;exp:number;levelUps:number;passUps:number;missionsCompleted?:string[];claimable?:number}; };
+  economy: { grantPlayRewards: (g:any)=>{coin:number;exp:number;levelUps:number;passUps:number;missionsCompleted?:string[];claimable?:number;premiumUnlocked?:boolean}; };
 }
 
 export interface ResultTimingStats { early: number; late: number; earlySum: number; lateSum: number; count: number; sum: number; }
@@ -71,6 +71,7 @@ export class ResultController {
       else {
         const lines = [`+${rewards.coin} Coin  ·  +${rewards.exp} EXP${rewards.levelUps ? `  ·  升级 ${rewards.levelUps} 级，获得 ${rewards.levelUps * 5} Crystal` : ''}${rewards.passUps ? `  ·  V-PASS +${rewards.passUps} 级` : ''}`];
         if (rewards.missionsCompleted?.length) lines.push(`每日任务完成：${rewards.missionsCompleted.join('、')}`);
+        if (rewards.premiumUnlocked) lines.push('✦ 高级通行证已解锁');
         if (rewards.claimable) lines.push(`✦ ${rewards.claimable} 项奖励待领取 · 前往「通行证」`);
         rewardLine.textContent = lines.join('\n');
       }

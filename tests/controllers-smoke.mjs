@@ -124,4 +124,4 @@ if (uiG.waitingKey !== null || uiStateMachine.state !== 'SELECT') throw new Erro
 UI.navigate('main');
 if (uiStateMachine.state !== 'MENU') throw new Error('UI return navigation failed');
 
-console.log('DREAMLAND V12.11 controller smoke: PASS');
+console.log('DREAMLAND V12.12 controller smoke: PASS');

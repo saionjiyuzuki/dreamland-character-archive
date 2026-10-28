@@ -1,5 +1,5 @@
 {
-  "name": "dreamland-v12-11-0-dizzy",
+  "name": "dreamland-v12-12-0-glass",
   "private": true,
   "scripts": {
     "build": "node scripts/clean-dist.mjs && tsc -p tsconfig.json",
@@ -12,5 +12,5 @@
     "typescript": "^5.8.3"
   },
   "type": "module",
-  "version": "12.11.0"
+  "version": "12.12.0"
 }

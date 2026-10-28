@@ -905,6 +905,55 @@ html,body{
 @keyframes shopFocus{0%,100%{box-shadow:none}50%{box-shadow:0 0 0 2px var(--accent),0 0 30px color-mix(in srgb,var(--accent) 40%,transparent)}}
 .hub-page .vp-hero{margin-top:0}
 @media(max-width:620px){.hub-top{gap:12px;height:58px;flex-basis:58px}.hub-brand small{display:none}.hub-wallet span{padding:5px 8px}.hub-tabs button{flex:1;padding:8px 10px;font-size:11px}.shop-grid{grid-template-columns:1fr}.shop-card{grid-template-columns:60px minmax(0,1fr);}.shop-art{width:60px;height:60px;font-size:24px}.shop-buy{grid-column:1/-1;flex-direction:row;justify-content:space-between;align-items:center}}
+
+/* ══════════════════════════════════════════════════
+   V12.12 毛玻璃：暂停全局模糊 + 菜单面板磨砂
+   ══════════════════════════════════════════════════ */
+:root{
+  --glass-bg:linear-gradient(145deg,rgba(176,190,255,.13),rgba(120,132,220,.05) 45%,rgba(12,16,44,.34));
+  --glass-border:rgba(222,228,255,.2);
+  --glass-hi:inset 0 1px 0 rgba(255,255,255,.16),inset 0 0 0 1px rgba(255,255,255,.03);
+  --glass-shadow:0 18px 48px rgba(2,4,16,.34);
+  --glass-blur:blur(16px) saturate(1.4);
+}
+/* 暂停：整个游戏画面（轨道、音符、HUD）都被模糊，菜单浮在一块玻璃面板上 */
+.pause-mask,.pause-mask.user-mode,.pause-mask.visibility-mode,.pause-mask.system-mode{
+  background:radial-gradient(ellipse at 50% 45%,rgba(40,48,110,.18),rgba(4,5,16,.5));
+  backdrop-filter:blur(22px) saturate(1.3) brightness(.78);-webkit-backdrop-filter:blur(22px) saturate(1.3) brightness(.78);
+}
+.pause-mask.show{animation:pauseBlurIn .22s ease both}
+@keyframes pauseBlurIn{from{opacity:0}to{opacity:1}}
+.screen:has(.pause-mask.show) .auto-btn,.screen:has(.pause-mask.show) .pause-btn{opacity:0;pointer-events:none}
+.pause-panel{display:flex;flex-direction:column;align-items:center;padding:30px 34px 28px;border:1px solid var(--glass-border);border-radius:18px;background:var(--glass-bg);box-shadow:var(--glass-hi),0 30px 80px rgba(0,0,0,.4);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.pause-mask.user-mode .pause-panel{pointer-events:auto}
+.pause-mask h2{margin-bottom:26px}
+.pause-mask:not(.visibility-mode) .full-pause-actions{display:flex;flex-direction:column;gap:10px}
+.pause-mask .menu-btn{border-radius:10px;border-color:rgba(222,228,255,.18);background:rgba(255,255,255,.06);box-shadow:var(--glass-hi);margin:0}
+.pause-mask .menu-btn:hover{background:rgba(255,255,255,.12)}
+.pause-mask .menu-btn.primary{background:linear-gradient(120deg,rgba(125,211,252,.2),rgba(167,139,250,.14))}
+
+/* 菜单面板 */
+.hub-top,.select-topbar,.character-top,.vp-hero,.vp-showcase,.vp-board,.daily-head,.daily-card,.daily-bonus,.loadout-stage,.loadout-card,
+.shop-card,.shop-promo,.sd-diff-info,.sd-stats,.story-panel,.keybind,.calib-stage,.dream-level,.sel-song,.song-card,.char-card,.vp-claim-all,.vp-buy,.vp-premium-owned{
+  backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
+}
+.vp-showcase,.vp-board,.loadout-stage,.daily-card,.loadout-card,.shop-card,.keybind,.calib-stage{background:var(--glass-bg);border-color:var(--glass-border);box-shadow:var(--glass-hi),var(--glass-shadow)}
+.vp-hero,.daily-head{box-shadow:var(--glass-hi),var(--glass-shadow);border-color:var(--glass-border)}
+.sd-stats div{background:rgba(9,13,38,.42)}
+.sel-song{box-shadow:var(--glass-hi)}
+.sc-panel{background:linear-gradient(150deg,rgba(60,70,150,.42),rgba(10,14,40,.62));backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4)}
+.sc-backdrop{background:rgba(3,5,18,.42);backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2)}
+.dream-main-nav .dream-nav-btn,.eco-tabs button,.diff-tab,.sd-preview,.sd-fav,.shop-listen,.hud-gauge,.pause-btn,.auto-btn{backdrop-filter:blur(12px) saturate(1.3);-webkit-backdrop-filter:blur(12px) saturate(1.3)}
+.eco-tabs button,.dream-main-nav .dream-nav-btn{box-shadow:var(--glass-hi)}
+.vp-buy .eco-progress{width:100%;margin:3px 0 1px}
+.vp-buy{cursor:pointer}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .pause-mask,.pause-mask.user-mode{background:rgba(4,4,10,.9)}
+  .vp-showcase,.vp-board,.loadout-stage,.daily-card,.loadout-card,.shop-card,.sc-panel{background:#0a0f2ae6}
+}
+@media (prefers-reduced-transparency:reduce){
+  .pause-mask,.pause-mask.user-mode{background:rgba(4,4,10,.92)}
+}
 </style>
 </head>
 <body>
@@ -1018,7 +1067,7 @@ html,body{
         </section>
         <aside class="select-detail-panel sd-panel" id="selectDetail"></aside>
       </div>
-      <div class="select-bottom-nav"><span>◈&nbsp; MUSIC</span><span class="select-nav-link" data-nav="character" role="button" tabindex="0">◇&nbsp; CHARACTER</span><span class="select-mission-link" data-economy-open="missions" role="button" tabindex="0">▽&nbsp; MISSION</span><span class="select-nav-link" data-economy-open="loadout" role="button" tabindex="0">✺&nbsp; LOADOUT</span><span class="select-version">DREAMLAND · V12.11.0</span></div>
+      <div class="select-bottom-nav"><span>◈&nbsp; MUSIC</span><span class="select-nav-link" data-nav="character" role="button" tabindex="0">◇&nbsp; CHARACTER</span><span class="select-mission-link" data-economy-open="missions" role="button" tabindex="0">▽&nbsp; MISSION</span><span class="select-nav-link" data-economy-open="loadout" role="button" tabindex="0">✺&nbsp; LOADOUT</span><span class="select-version">DREAMLAND · V12.12.0</span></div>
       <div class="select-confirm hidden" id="selectConfirm"></div>
     </div>
 
@@ -1178,11 +1227,13 @@ html,body{
     <button class="auto-btn" id="autoBtn">AUTO</button>
     <button class="pause-btn" id="pauseBtn">❚❚</button>
     <div class="pause-mask" id="pauseMask">
-      <h2 id="pauseTitle">Paused</h2>
-      <div class="pause-hint" id="pauseHint">点击继续</div>
-      <div class="full-pause-actions">
-        <button class="menu-btn primary" id="resumeBtn">继续游戏</button>
-        <button class="menu-btn" id="quitBtn">退出</button>
+      <div class="pause-panel">
+        <h2 id="pauseTitle">Paused</h2>
+        <div class="pause-hint" id="pauseHint">点击继续</div>
+        <div class="full-pause-actions">
+          <button class="menu-btn primary" id="resumeBtn">继续游戏</button>
+          <button class="menu-btn" id="quitBtn">退出</button>
+        </div>
       </div>
     </div>
 

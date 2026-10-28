@@ -1,6 +1,6 @@
 import type { Chart } from '../core/types.js';
 import { DEFAULT_HIT_EFFECT, DEFAULT_NOTE_SKIN, HIT_EFFECTS, NOTE_SKINS, findHitEffect, findNoteSkin, gradeLabel, setActiveCosmetics } from '../cosmetics/catalog.js';
-import { PASS_EXP_PER_TIER, PASS_MAX_TIER, PASS_SEASON, PASS_TIERS, PREMIUM_PASS_PRICE, cosmeticSource, isCosmeticReward, passReward, rewardLabel, type PassReward, type PassTrack } from './passSeason.js';
+import { PASS_EXP_PER_TIER, PASS_MAX_TIER, PASS_SEASON, PASS_TIERS, PREMIUM_PASS_MISSIONS, cosmeticSource, isCosmeticReward, passReward, rewardLabel, type PassReward, type PassTrack } from './passSeason.js';
 import { DAILY_BONUS, dailyBonusReady, ensureDaily, findMission, formatCountdown, localDateKey, missionStatus, msUntilReset, recordPlay, type DailyState, type MissionReward } from './dailyMissions.js';
 import { CosmeticPreview } from '../render/cosmeticPreview.js';
 import { escapeHTML, pad2 } from '../ui/html.js';
@@ -11,10 +11,12 @@ type SaveData = {
   premiumPass:boolean; claimedFree:number[]; claimedPremium:number[];
   unlockedSongs:string[]; ownedCosmetics:string[]; equippedCosmetic:string;
   equippedNoteSkin:string; equippedHitEffect:string; daily:DailyState; plays:number;
+  /** Daily missions completed over all days; PREMIUM_PASS_MISSIONS of them unlock the premium track. */
+  missionsDone:number;
 };
 type TierState = 'claimed' | 'claimable' | 'locked' | 'premiumLocked';
 type CosmeticKind = 'noteSkin' | 'hitEffect';
-export type PlayRewards = { coin:number; exp:number; levelUps:number; passUps:number; crystals:number; coins:number; missionsCompleted:string[]; claimable:number };
+export type PlayRewards = { coin:number; exp:number; levelUps:number; passUps:number; crystals:number; coins:number; missionsCompleted:string[]; claimable:number; premiumUnlocked:boolean };
 
 const KEY = 'dreamland_economy_v1';
 const SAVE_VERSION = 2;
@@ -41,6 +43,7 @@ export function normalizeSaveData(raw: unknown, base: SaveData): SaveData {
     const r = passReward('free', tier);
     if (r && isCosmeticReward(r) && !ownedCosmetics.includes(r.id)) ownedCosmetics.push(r.id);
   }
+  const daily = ensureDaily(value.daily);
   return {
     version: SAVE_VERSION,
     coins: integer(value.coins, base.coins),
@@ -57,8 +60,10 @@ export function normalizeSaveData(raw: unknown, base: SaveData): SaveData {
     equippedCosmetic: typeof value.equippedCosmetic === 'string' ? value.equippedCosmetic : base.equippedCosmetic,
     equippedNoteSkin: typeof value.equippedNoteSkin === 'string' ? value.equippedNoteSkin : base.equippedNoteSkin,
     equippedHitEffect: typeof value.equippedHitEffect === 'string' ? value.equippedHitEffect : base.equippedHitEffect,
-    daily: ensureDaily(value.daily),
+    daily,
     plays: integer(value.plays, base.plays),
+    // Saves before V12.12 did not count missions; start from what today's missions already show as done.
+    missionsDone: integer(value.missionsDone, daily.missions.filter(id => missionStatus(daily, id).done).length),
   };
 }
 
@@ -105,12 +110,13 @@ export class EconomyService {
 
   constructor(charts:Record<string,Chart>,private toast:(s:string)=>void,private opts:EconomyOptions={}){
     this.charts=charts;
-    const base:SaveData={version:SAVE_VERSION,coins:0,crystals:0,exp:0,level:1,passExp:0,passLevel:1,premiumPass:false,claimedFree:[],claimedPremium:[],unlockedSongs:[],ownedCosmetics:[],equippedCosmetic:'default',equippedNoteSkin:DEFAULT_NOTE_SKIN,equippedHitEffect:DEFAULT_HIT_EFFECT,daily:ensureDaily(null),plays:0};
+    const base:SaveData={version:SAVE_VERSION,coins:0,crystals:0,exp:0,level:1,passExp:0,passLevel:1,premiumPass:false,claimedFree:[],claimedPremium:[],unlockedSongs:[],ownedCosmetics:[],equippedCosmetic:'default',equippedNoteSkin:DEFAULT_NOTE_SKIN,equippedHitEffect:DEFAULT_HIT_EFFECT,daily:ensureDaily(null),plays:0,missionsDone:0};
     try { this.data = normalizeSaveData(JSON.parse(localStorage.getItem(KEY) || 'null'), base); } catch { this.data = { ...base }; }
     // V12.9 unlocked single charts; a purchased chart now unlocks its whole song (every difficulty).
     this.data.unlockedSongs=[...new Set(this.data.unlockedSongs.map(id=>songOfChart(id)?.id||id))];
     if (!this.owns(this.data.equippedNoteSkin) || !findNoteSkin(this.data.equippedNoteSkin)) this.data.equippedNoteSkin = DEFAULT_NOTE_SKIN;
     if (!this.owns(this.data.equippedHitEffect) || !findHitEffect(this.data.equippedHitEffect)) this.data.equippedHitEffect = DEFAULT_HIT_EFFECT;
+    if(this.unlockPremiumIfEarned())this.save();
     this.applyCosmetic(); this.bindEvents(); this.refresh();
   }
   save(){try{localStorage.setItem(KEY,JSON.stringify(this.data));}catch{} this.refresh();}
@@ -130,8 +136,10 @@ export class EconomyService {
     while(this.data.exp>=this.expForNextLevel(this.data.level)){this.data.exp-=this.expForNextLevel(this.data.level);this.data.level++;this.data.crystals+=5;levelUps++;}
     const passUps=this.addPassExp(exp);
     const completed=recordPlay(this.daily(),{songId:String(g.chart?.songId||g.chart?.id||''),pure,great,far,lost,maxCombo:Number(g.maxCombo)||0,score:Number(g.score)||0,accuracy});
+    this.data.missionsDone+=completed.length;
+    const premiumUnlocked=this.unlockPremiumIfEarned();
     this.save();
-    return {coin,exp,levelUps,passUps,crystals:this.data.crystals,coins:this.data.coins,missionsCompleted:completed.map(id=>findMission(id)?.title||id),claimable:this.claimableCount()};
+    return {coin,exp,levelUps,passUps,crystals:this.data.crystals,coins:this.data.coins,missionsCompleted:completed.map(id=>findMission(id)?.title||id),claimable:this.claimableCount(),premiumUnlocked};
   }
   expForNextLevel(level:number){return 100+(Math.max(1,level)-1)*25;}
 
@@ -180,13 +188,19 @@ export class EconomyService {
     this.save();this.toast(`已领取 ${got.length} 项奖励：${summarize(got)}`);this.rerender();
     return got.length;
   }
-  buyPremium(){
-    if(this.data.premiumPass){this.toast('高级通行证已激活');return false;}
-    if(this.data.crystals<PREMIUM_PASS_PRICE){this.toast(`Crystal 不足：需要 ${PREMIUM_PASS_PRICE}`);return false;}
-    this.data.crystals-=PREMIUM_PASS_PRICE;this.data.premiumPass=true;this.save();
+  /** Missions still needed for the premium track (0 once it is active). */
+  premiumMissionsLeft(){return this.data.premiumPass?0:Math.max(0,PREMIUM_PASS_MISSIONS-this.data.missionsDone);}
+  /** Activates the premium track once enough daily missions are complete; true when it just unlocked. */
+  unlockPremiumIfEarned(){
+    if(this.data.premiumPass||this.data.missionsDone<PREMIUM_PASS_MISSIONS)return false;
+    this.data.premiumPass=true;
     const pending=PASS_TIERS.filter(row=>this.tierState('premium',row.tier)==='claimable').length;
-    this.toast(`高级通行证已激活${pending?`，${pending} 项高级奖励可领取`:''}`);this.rerender();
+    this.toast(`完成 ${PREMIUM_PASS_MISSIONS} 个每日任务，高级通行证已解锁${pending?`，${pending} 项高级奖励可领取`:''}`);
     return true;
+  }
+  private premiumProgress(){
+    const done=Math.min(PREMIUM_PASS_MISSIONS,this.data.missionsDone);
+    return `<button type="button" class="vp-buy" data-economy-open="missions"><b>完成 ${PREMIUM_PASS_MISSIONS} 个每日任务解锁高级通行证 · ${done} / ${PREMIUM_PASS_MISSIONS}</b><div class="eco-progress"><i style="width:${done/PREMIUM_PASS_MISSIONS*100}%"></i></div><small>任务达成即计入，解锁后可补领已达成等级的高级奖励 · 前往每日任务 ›</small></button>`;
   }
 
   /* ── 每日任务 ── */
@@ -317,7 +331,7 @@ export class EconomyService {
       return `${tabs}<p class="shop-lead">长条与判定的主题色，使用打歌获得的 Coin 购买。音符样式与打击特效来自 <button type="button" class="shop-link" data-economy-open="loadout">V-PASS · 装扮</button>。</p><div class="shop-grid">${items}</div>`;
     }
     const cards=SONGS.map(song=>this.shopSongCard(song)).join('');
-    const promo=this.data.premiumPass?'':`<button type="button" class="shop-promo" data-economy-open="pass"><small>V-PASS ${PASS_SEASON.code}</small><strong>高级通行证 · 6 款高级音符与打击特效</strong><span>✧ ${PREMIUM_PASS_PRICE} Crystal 解锁 · 前往通行证 ›</span></button>`;
+    const promo=this.data.premiumPass?'':`<button type="button" class="shop-promo" data-economy-open="pass"><small>V-PASS ${PASS_SEASON.code}</small><strong>高级通行证 · 6 款高级音符与打击特效</strong><span>完成 ${PREMIUM_PASS_MISSIONS} 个每日任务免费解锁 · ${Math.min(PREMIUM_PASS_MISSIONS,this.data.missionsDone)} / ${PREMIUM_PASS_MISSIONS} ›</span></button>`;
     return `${tabs}${promo}<p class="shop-lead">使用 Crystal 解锁曲目，一次解锁包含 EZ / HD / EX / DZ 全部难度。Crystal 来自等级提升、V-PASS 里程碑与每日任务。</p><div class="shop-grid songs">${cards}</div>`;
   }
   private shopSongCard(song:SongEntry){
@@ -373,9 +387,9 @@ export class EconomyService {
         <p>演奏歌曲与完成每日任务获得 V-PASS EXP。每 5 级里程碑奖励 Crystal，初级音符与打击特效在免费轨道，高级款式在高级轨道。</p></div>
       <div class="vp-showcase"><canvas class="cosmetic-preview" data-cosmetic-preview></canvas><div class="vp-showcase-copy"><small>REWARD PREVIEW</small><strong data-preview-label>${this.previewLabel()}</strong><span>点击轨道中的音符 / 特效奖励即可预览</span></div></div>
     </section>
-    <div class="vp-actions"><button type="button" class="vp-claim-all" data-pass-claim-all ${claimable?'':'disabled'}>一键领取${claimable?` · ${claimable}`:''}</button>${premium?'<span class="vp-premium-owned">✦ 高级通行证已激活</span>':`<button type="button" class="vp-buy" data-pass-premium><b>解锁高级通行证</b><small>✧ ${PREMIUM_PASS_PRICE} Crystal · 立即补领已达成等级的高级奖励</small></button>`}</div>
+    <div class="vp-actions"><button type="button" class="vp-claim-all" data-pass-claim-all ${claimable?'':'disabled'}>一键领取${claimable?` · ${claimable}`:''}</button>${premium?'<span class="vp-premium-owned">✦ 高级通行证已激活</span>':this.premiumProgress()}</div>
     <div class="vp-board"><div class="vp-rail-labels"><span class="lbl-tier">TIER</span><span class="lbl-free">免费<small>FREE</small></span><span class="lbl-premium">高级<small>PREMIUM</small></span></div><div class="vp-track">${cols}</div></div>
-    <p class="eco-note">奖励需手动领取，达到满级后不会过期。高级通行证使用游戏内 Crystal 解锁，不涉及真实支付；免费轨道共 110 Crystal，高级轨道共 122 Crystal。</p>`;
+    <p class="eco-note">奖励需手动领取，达到满级后不会过期。高级通行证完成任意 6 个每日任务即可解锁，不消耗 Crystal；免费轨道共 110 Crystal，高级轨道共 122 Crystal。</p>`;
   }
   private previewLabel(){return `${escapeHTML(findNoteSkin(this.previewPick.skin)?.name||'')} × ${escapeHTML(findHitEffect(this.previewPick.fx)?.name||'')}`;}
   private setPreview(kind:CosmeticKind,id:string){
@@ -393,7 +407,7 @@ export class EconomyService {
       return `<article class="daily-card${st.claimable?' ready':''}${st.claimed?' claimed':''}"><div class="daily-info"><strong>${escapeHTML(st.def.title)}</strong><div class="daily-bar"><i style="width:${pct}%"></i></div><small>${fmt(id,st.value)} / ${fmt(id,st.target)}</small></div><div class="daily-rewards">${chips(st.def.reward)}</div><button type="button" data-daily-claim="${id}" ${st.claimable?'':'disabled'}>${st.claimed?'已领取':st.claimable?'领取':'进行中'}</button></article>`;
     }).join('');
     const done=d.missions.filter(id=>d.claimed.includes(id)).length,ready=dailyBonusReady(d);
-    return `<section class="daily-head"><div><small>DAILY MISSIONS · ${d.date}</small><h3>每日任务</h3><p>完成任务获得 V-PASS EXP、Coin 与 Crystal，AUTO 演奏不计入进度。</p></div><div class="daily-reset"><small>距离刷新</small><b data-daily-countdown>${formatCountdown(msUntilReset())}</b></div></section>
+    return `<section class="daily-head"><div><small>DAILY MISSIONS · ${d.date}</small><h3>每日任务</h3><p>完成任务获得 V-PASS EXP、Coin 与 Crystal，AUTO 演奏不计入进度。${this.data.premiumPass?'':`累计完成 ${PREMIUM_PASS_MISSIONS} 个任务解锁高级通行证 · ${Math.min(PREMIUM_PASS_MISSIONS,this.data.missionsDone)} / ${PREMIUM_PASS_MISSIONS}`}</p></div><div class="daily-reset"><small>距离刷新</small><b data-daily-countdown>${formatCountdown(msUntilReset())}</b></div></section>
     <div class="daily-list">${cards}</div>
     <div class="daily-bonus${ready?' ready':''}${d.bonusClaimed?' claimed':''}"><div><strong>全部完成奖励</strong><small>领取今日全部 ${d.missions.length} 个任务后解锁 · ${done} / ${d.missions.length}</small><div class="daily-bar"><i style="width:${done/Math.max(1,d.missions.length)*100}%"></i></div></div><div class="daily-rewards">${chips(DAILY_BONUS)}</div><button type="button" data-daily-bonus ${ready?'':'disabled'}>${d.bonusClaimed?'已领取':ready?'领取':'未完成'}</button></div>`;
   }
@@ -418,7 +432,6 @@ export class EconomyService {
       const play=t.closest('[data-shop-play]') as HTMLElement|null;if(play?.dataset.shopPlay){this.opts.selectSong?.(play.dataset.shopPlay);this.opts.navigate?.('songSelect');return;}
       const cosmetic=t.closest('[data-buy-cosmetic]') as HTMLElement|null;if(cosmetic?.dataset.buyCosmetic){this.buyCosmetic(cosmetic.dataset.buyCosmetic);return;}
       if(t.closest('[data-pass-claim-all]')){this.claimAllPass();return;}
-      if(t.closest('[data-pass-premium]')){this.buyPremium();return;}
       const cell=t.closest('[data-pass-claim]') as HTMLElement|null;
       if(cell?.dataset.passClaim){
         const [track,tierText]=cell.dataset.passClaim.split(':'),tier=Number(tierText);
@@ -426,7 +439,7 @@ export class EconomyService {
           const r=passReward(track,tier);
           if(this.tierState(track,tier)==='claimable')this.claimTier(track,tier);
           else if(r&&isCosmeticReward(r))this.setPreview(r.kind,r.id);
-          else if(this.tierState(track,tier)==='premiumLocked')this.toast(`解锁高级通行证（✧ ${PREMIUM_PASS_PRICE} Crystal）后可领取`);
+          else if(this.tierState(track,tier)==='premiumLocked')this.toast(`再完成 ${this.premiumMissionsLeft()} 个每日任务即可解锁高级通行证`);
         }
         return;
       }
