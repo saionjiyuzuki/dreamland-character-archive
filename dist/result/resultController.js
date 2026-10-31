@@ -35,9 +35,11 @@ export class ResultController {
         else if (accuracy >= 0.75)
             grade = 'B';
         const finalScore = Math.round(G.score);
-        if (G.chart && !G.autoUsed)
+        // Editor playtests (chart.playtest) are practice: no best score, no rewards.
+        const counts = !!G.chart && !G.autoUsed && !G.chart.playtest;
+        if (counts)
             this.d.setBest(G.chart.id, finalScore, grade);
-        const rewards = G.chart && !G.autoUsed ? this.d.economy.grantPlayRewards(G) : null;
+        const rewards = counts ? this.d.economy.grantPlayRewards(G) : null;
         D.resultGrade.textContent = grade;
         D.resultGrade.className = 'result-grade ' + grade;
         D.resultSong.textContent = (G.chart ? G.chart.title : '曲目') + ' · ' + (G.chart?.difficulty ? G.chart.difficulty + ' ' : '') + 'LV.' + (G.chart ? G.chart.diff : '?');
@@ -62,7 +64,7 @@ export class ResultController {
         }
         if (rewardLine) {
             if (!rewards)
-                rewardLine.textContent = 'AUTO 演奏不发放奖励';
+                rewardLine.textContent = G.chart?.playtest ? '编辑器试玩不发放奖励' : 'AUTO 演奏不发放奖励';
             else {
                 const lines = [`+${rewards.coin} Coin  ·  +${rewards.exp} EXP${rewards.levelUps ? `  ·  升级 ${rewards.levelUps} 级，获得 ${rewards.levelUps * 5} Crystal` : ''}${rewards.passUps ? `  ·  V-PASS +${rewards.passUps} 级` : ''}`];
                 if (rewards.missionsCompleted?.length)

@@ -46,8 +46,10 @@ export class ResultController {
     else if (accuracy >= 0.75) grade = 'B';
 
     const finalScore = Math.round(G.score);
-    if (G.chart && !G.autoUsed) this.d.setBest(G.chart.id, finalScore, grade);
-    const rewards = G.chart && !G.autoUsed ? this.d.economy.grantPlayRewards(G) : null;
+    // Editor playtests (chart.playtest) are practice: no best score, no rewards.
+    const counts = !!G.chart && !G.autoUsed && !G.chart.playtest;
+    if (counts) this.d.setBest(G.chart.id, finalScore, grade);
+    const rewards = counts ? this.d.economy.grantPlayRewards(G) : null;
 
     D.resultGrade.textContent = grade;
     D.resultGrade.className = 'result-grade ' + grade;
@@ -67,7 +69,7 @@ export class ResultController {
     let rewardLine = document.getElementById('resultRewards');
     if (!rewardLine && typeof D.rScore.insertAdjacentElement === 'function') { rewardLine = document.createElement('div'); rewardLine.id = 'resultRewards'; rewardLine.className = 'result-rewards'; D.rScore.insertAdjacentElement('afterend', rewardLine); }
     if (rewardLine) {
-      if (!rewards) rewardLine.textContent = 'AUTO 演奏不发放奖励';
+      if (!rewards) rewardLine.textContent = G.chart?.playtest ? '编辑器试玩不发放奖励' : 'AUTO 演奏不发放奖励';
       else {
         const lines = [`+${rewards.coin} Coin  ·  +${rewards.exp} EXP${rewards.levelUps ? `  ·  升级 ${rewards.levelUps} 级，获得 ${rewards.levelUps * 5} Crystal` : ''}${rewards.passUps ? `  ·  V-PASS +${rewards.passUps} 级` : ''}`];
         if (rewards.missionsCompleted?.length) lines.push(`每日任务完成：${rewards.missionsCompleted.join('、')}`);

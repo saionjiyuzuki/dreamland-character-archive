@@ -30,6 +30,7 @@ import { sampleMultiHoldPath } from './chart/holdPath.js';
 import { buildMultiHoldOccupations, resolveMultiHoldConflicts } from './runtime/LaneOccupation.js';
 import { backdropShapes, drawTrackBackdrop } from './render/trackBackdrop.js';
 import { GAUGE, gaugeValue, liveAccuracy } from './gameplay/lifeGauge.js';
+import { isPlaytestRequest, loadPlaytest } from './editor/playtestBridge.js';
 /* ── 3D 透视参数 ── */
 const PERSP = {
     horizonRatio: 0.10, // 地平线 y 比例
@@ -348,6 +349,8 @@ async function loadAppScope() {
         if (token !== G.loadingToken || StateMachine.state !== APP_STATE.LOADING || StateMachine.context.scope !== 'app')
             return;
         StateMachine.transition(APP_STATE.MENU, { page: 'main' });
+        if (isPlaytestRequest())
+            void startEditorPlaytest();
     }
     catch (err) {
         if (token !== G.loadingToken)
@@ -375,6 +378,55 @@ async function loadSongScope(chart, token) {
         G.loadingToken++;
         StateMachine.transition(APP_STATE.SELECT, { toast: '歌曲加载失败：' + (err?.message || '无法读取音频') });
     }
+}
+/** index.html?playtest: play the chart handed over by the chart editor (editor.html). */
+async function startEditorPlaytest() {
+    const res = await loadPlaytest();
+    if ('error' in res) {
+        toast(res.error);
+        return;
+    }
+    AUDIO_SOURCES_TEST[res.chart.id] = res.audioUrl;
+    // A tab opened by window.open has no user gesture yet, so the AudioContext may stay suspended until the first click.
+    if (!(await audioUnlocked()))
+        await waitForGesture('点击任意位置开始试玩');
+    if (StateMachine.state === APP_STATE.MENU)
+        StateMachine.transition(APP_STATE.SELECT);
+    if (StateMachine.state !== APP_STATE.SELECT) {
+        toast('无法开始试玩，请回到主界面后重试');
+        return;
+    }
+    startGame(res.chart);
+}
+/** True when the AudioContext runs. resume() stays pending without a user gesture, so it is not awaited for long. */
+async function audioUnlocked() {
+    if (!AudioEngine.init())
+        return false;
+    if (AudioEngine.ctx.state === 'running')
+        return true;
+    return Promise.race([AudioEngine.resume(), new Promise(r => setTimeout(() => r(false), 300))]);
+}
+/** Shows a prompt over the game screen until the first click, tap or key press, then resumes audio. */
+function waitForGesture(msg) {
+    return new Promise(resolve => {
+        const el = document.createElement('div');
+        el.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:60;background:rgba(4,4,10,.72);color:#eef0f6;font-size:14px;letter-spacing:4px;cursor:pointer;';
+        el.textContent = msg;
+        D.screen.appendChild(el);
+        // click (not pointerdown), swallowed in the capture phase, so the same click cannot also press a menu button.
+        const go = e => {
+            e.preventDefault();
+            e.stopPropagation();
+            document.removeEventListener('click', go, true);
+            document.removeEventListener('keydown', go, true);
+            el.remove();
+            AudioEngine.resume();
+            AudioEngine.setVolume(G.volume);
+            resolve();
+        };
+        document.addEventListener('click', go, true);
+        document.addEventListener('keydown', go, true);
+    });
 }
 function cancelSongLoading() {
     if (StateMachine.state !== APP_STATE.LOADING || StateMachine.context.scope !== 'song')
